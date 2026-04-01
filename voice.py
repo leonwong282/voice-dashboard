@@ -38,9 +38,9 @@ class TTSItem:
 class BatchTTSRunner:
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
-        self.api_key = os.getenv("MINIMAX_API_KEY") or os.getenv("api_key")
+        self.api_key = os.getenv("MINIMAX_API_KEY")
         if not args.dry_run and not self.api_key:
-            raise ValueError("找不到 API 金鑰。請設定 MINIMAX_API_KEY（或舊的 api_key）環境變數。")
+            raise ValueError("找不到 API 金鑰。請設定 MINIMAX_API_KEY 環境變數。")
 
         self.outdir = Path(args.outdir)
         self.outdir.mkdir(parents=True, exist_ok=True)

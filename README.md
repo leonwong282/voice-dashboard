@@ -12,11 +12,8 @@
 ---
 
 ## 環境變數
-優先讀取：
+僅讀取：
 - `MINIMAX_API_KEY`
-- 備援：`api_key`
-
-建議只使用 `MINIMAX_API_KEY`，便於團隊一致管理。
 
 ---
 
