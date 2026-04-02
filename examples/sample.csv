@@ -1,0 +1,3 @@
+id,text,filename,voice_id,speed,format
+intro,大家好，歡迎來到今天的節目,intro,clone_voice_can,1.1,mp3
+part1,第一段內容示範,,clone_voice_can,1.2,mp3
