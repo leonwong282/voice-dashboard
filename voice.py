@@ -1,15 +1,19 @@
 import argparse
-import csv
 import json
 import os
-import random
 import re
+import shutil
+import subprocess
+import sys
+import tempfile
 import time
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-from urllib import error, request
+from typing import Any
+
+import requests
+
 
 API_URL = "https://api.minimaxi.com/v1/t2a_v2"
 DEFAULT_MODEL = "speech-2.8-hd"
@@ -17,363 +21,481 @@ DEFAULT_LANGUAGE_BOOST = "Chinese,Yue"
 DEFAULT_VOICE_ID = "clone_voice_can"
 DEFAULT_SPEED = 1.2
 DEFAULT_PITCH = 0
-DEFAULT_FORMAT = "mp3"
 DEFAULT_SAMPLE_RATE = 32000
+DEFAULT_FORMAT = "mp3"
+DEFAULT_TIMEOUT_SECONDS = 60
+DEFAULT_MAX_RETRIES = 3
 
 
-@dataclass
-class TTSItem:
-    item_id: str
-    text: str
-    filename: Optional[str] = None
-    model: Optional[str] = None
-    voice_id: Optional[str] = None
-    speed: Optional[float] = None
-    pitch: Optional[float] = None
-    language_boost: Optional[str] = None
-    audio_format: Optional[str] = None
-    sample_rate: Optional[int] = None
+class TTSBatchError(RuntimeError):
+    """Raised when the TTS batch job cannot continue."""
 
 
-class BatchTTSRunner:
-    def __init__(self, args: argparse.Namespace) -> None:
-        self.args = args
-        self.api_key = os.getenv("MINIMAX_API_KEY")
-        if not args.dry_run and not self.api_key:
-            raise ValueError("找不到 API 金鑰。請設定 MINIMAX_API_KEY 環境變數。")
+class RetryableTTSBatchError(TTSBatchError):
+    """Raised for failures that are safe to retry."""
 
-        self.outdir = Path(args.outdir)
-        self.outdir.mkdir(parents=True, exist_ok=True)
-        self.manifest_dir = Path(args.manifest_dir)
-        self.manifest_dir.mkdir(parents=True, exist_ok=True)
-        self.log_dir = Path(args.log_dir)
-        self.log_dir.mkdir(parents=True, exist_ok=True)
 
-        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        self.run_id = ts
-        self.manifest_path = self.manifest_dir / f"manifest_{self.run_id}.json"
-        self.latest_manifest_path = self.manifest_dir / "latest_manifest.json"
-        self.log_path = self.log_dir / f"run_{self.run_id}.json"
+@dataclass(frozen=True)
+class TTSSettings:
+    model: str
+    language_boost: str
+    voice_id: str
+    speed: float
+    pitch: int
+    sample_rate: int
+    audio_format: str
 
-        self.manifest: Dict[str, Any] = self._init_manifest()
-        if self.args.resume:
-            self._load_latest_manifest_if_exists()
 
-    def _init_manifest(self) -> Dict[str, Any]:
-        return {
-            "run_id": self.run_id,
-            "input_file": self.args.input,
-            "outdir": str(self.outdir),
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "settings": {
-                "default_model": self.args.default_model,
-                "default_voice_id": self.args.default_voice_id,
-                "default_speed": self.args.default_speed,
-                "default_pitch": self.args.default_pitch,
-                "default_language_boost": self.args.default_language_boost,
-                "default_format": self.args.default_format,
-                "default_sample_rate": self.args.default_sample_rate,
-                "max_retries": self.args.max_retries,
-                "retry_backoff": self.args.retry_backoff,
-                "dry_run": self.args.dry_run,
-            },
-            "items": {},
-        }
-
-    def _load_latest_manifest_if_exists(self) -> None:
-        if not self.latest_manifest_path.exists():
-            print("ℹ️ --resume 啟用，但找不到 latest_manifest.json，將從頭開始。")
-            return
-        try:
-            old_manifest = json.loads(self.latest_manifest_path.read_text(encoding="utf-8"))
-        except Exception as exc:
-            print(f"⚠️ 無法讀取既有 manifest，將從頭開始：{exc}")
-            return
-
-        if old_manifest.get("input_file") != self.args.input:
-            print("ℹ️ latest_manifest 的 input 與本次不同，將從頭開始。")
-            return
-
-        self.manifest["items"] = old_manifest.get("items", {})
-        print(f"ℹ️ 已載入既有進度，共 {len(self.manifest['items'])} 筆。")
-
-    def run(self) -> int:
-        items = self._load_items(self.args.input)
-        if not items:
-            print("沒有可處理的文字內容。")
-            return 1
-
-        total = len(items)
-        stats = {"total": total, "success": 0, "failed": 0, "skipped": 0}
-        started = time.time()
-
-        for idx, item in enumerate(items, 1):
-            normalized = self._normalize_item(item, idx)
-            existing = self.manifest["items"].get(normalized.item_id)
-            if self.args.resume and existing and existing.get("status") == "success":
-                print(f"[{idx}/{total}] ⏭️ skip {normalized.item_id} (已成功)")
-                stats["skipped"] += 1
-                continue
-
-            output_filename = self._resolve_output_filename(normalized, idx)
-            output_path = self.outdir / output_filename
-            if output_path.exists() and not self.args.overwrite:
-                print(f"[{idx}/{total}] ⏭️ skip {normalized.item_id} ({output_filename} 已存在)")
-                self._record_item(normalized.item_id, "skipped", output_filename, "file_exists")
-                stats["skipped"] += 1
-                continue
-
-            ok, err = self._process_single_item(normalized, output_path)
-            if ok:
-                stats["success"] += 1
-            else:
-                stats["failed"] += 1
-                print(f"[{idx}/{total}] ❌ failed {normalized.item_id}: {err}")
-
-            self._persist_manifest()
-
-        duration = round(time.time() - started, 2)
-        summary = {**stats, "duration_seconds": duration}
-        print("\n=== Batch Summary ===")
-        print(json.dumps(summary, ensure_ascii=False, indent=2))
-
-        run_log = {
-            "run_id": self.run_id,
-            "finished_at": datetime.now(timezone.utc).isoformat(),
-            "summary": summary,
-            "manifest_path": str(self.manifest_path),
-            "items": self.manifest["items"],
-        }
-        self.log_path.write_text(json.dumps(run_log, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"📝 log: {self.log_path}")
-        return 0 if stats["failed"] == 0 else 2
-
-    def _load_items(self, input_path: str) -> List[TTSItem]:
-        path = Path(input_path)
-        if not path.exists():
-            raise FileNotFoundError(f"找不到輸入檔：{path}")
-
-        ext = path.suffix.lower()
-        if ext == ".csv":
-            return self._load_csv(path)
-        if ext == ".json":
-            return self._load_json(path)
-        if ext == ".txt":
-            return self._load_txt(path)
-        raise ValueError(f"不支援的輸入格式：{ext}，請使用 .csv / .json / .txt")
-
-    def _load_csv(self, path: Path) -> List[TTSItem]:
-        rows: List[TTSItem] = []
-        with path.open("r", encoding="utf-8-sig", newline="") as f:
-            reader = csv.DictReader(f)
-            for i, row in enumerate(reader, 1):
-                text = (row.get("text") or "").strip()
-                if not text:
-                    continue
-                rows.append(
-                    TTSItem(
-                        item_id=(row.get("id") or f"row_{i}").strip(),
-                        text=text,
-                        filename=(row.get("filename") or "").strip() or None,
-                        model=(row.get("model") or "").strip() or None,
-                        voice_id=(row.get("voice_id") or "").strip() or None,
-                        speed=self._to_float(row.get("speed")),
-                        pitch=self._to_float(row.get("pitch")),
-                        language_boost=(row.get("language_boost") or "").strip() or None,
-                        audio_format=(row.get("format") or "").strip() or None,
-                        sample_rate=self._to_int(row.get("sample_rate")),
-                    )
-                )
-        return rows
-
-    def _load_json(self, path: Path) -> List[TTSItem]:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data, list):
-            raise ValueError("JSON 內容必須是陣列。")
-        rows: List[TTSItem] = []
-        for i, row in enumerate(data, 1):
-            if not isinstance(row, dict):
-                continue
-            text = str(row.get("text", "")).strip()
-            if not text:
-                continue
-            rows.append(
-                TTSItem(
-                    item_id=str(row.get("id") or f"row_{i}"),
-                    text=text,
-                    filename=(str(row.get("filename", "")).strip() or None),
-                    model=(str(row.get("model", "")).strip() or None),
-                    voice_id=(str(row.get("voice_id", "")).strip() or None),
-                    speed=self._to_float(row.get("speed")),
-                    pitch=self._to_float(row.get("pitch")),
-                    language_boost=(str(row.get("language_boost", "")).strip() or None),
-                    audio_format=(str(row.get("format", "")).strip() or None),
-                    sample_rate=self._to_int(row.get("sample_rate")),
-                )
-            )
-        return rows
-
-    def _load_txt(self, path: Path) -> List[TTSItem]:
-        items: List[TTSItem] = []
-        for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            text = line.strip()
-            if not text:
-                continue
-            items.append(TTSItem(item_id=f"line_{i}", text=text))
-        return items
-
-    def _normalize_item(self, item: TTSItem, index: int) -> TTSItem:
-        item.item_id = self._sanitize_id(item.item_id or f"item_{index}")
-        item.model = item.model or self.args.default_model
-        item.voice_id = item.voice_id or self.args.default_voice_id
-        item.speed = item.speed if item.speed is not None else self.args.default_speed
-        item.pitch = item.pitch if item.pitch is not None else self.args.default_pitch
-        item.language_boost = item.language_boost or self.args.default_language_boost
-        item.audio_format = (item.audio_format or self.args.default_format).lower()
-        item.sample_rate = item.sample_rate or self.args.default_sample_rate
-        return item
-
-    def _process_single_item(self, item: TTSItem, output_path: Path) -> Tuple[bool, Optional[str]]:
-        if self.args.dry_run:
-            print(f"[DRY-RUN] {item.item_id} -> {output_path.name}")
-            self._record_item(item.item_id, "success", output_path.name, None, payload=asdict(item))
-            return True, None
-
-        payload: Dict[str, Any] = {
-            "model": item.model,
-            "text": item.text,
-            "language_boost": item.language_boost,
-            "voice_setting": {"voice_id": item.voice_id, "speed": item.speed, "pitch": item.pitch},
-            "audio_setting": {"format": item.audio_format, "sample_rate": item.sample_rate},
-        }
-
-        for attempt in range(self.args.max_retries + 1):
-            try:
-                status, body = self._http_post_json(API_URL, payload)
-                if status >= 400:
-                    if self._is_retryable_status(status):
-                        raise RuntimeError(f"HTTP {status}: {body[:500]}")
-                    self._record_item(item.item_id, "failed", output_path.name, f"HTTP {status}: {body[:500]}", payload)
-                    return False, f"HTTP {status}"
-
-                data = json.loads(body)
-                audio_hex = data.get("data", {}).get("audio")
-                if not audio_hex:
-                    raise RuntimeError("回應缺少 data.audio")
-
-                tmp_path = output_path.with_suffix(output_path.suffix + ".tmp")
-                tmp_path.write_bytes(bytes.fromhex(audio_hex))
-                tmp_path.replace(output_path)
-                print(f"✅ {item.item_id} -> {output_path.name}")
-                self._record_item(item.item_id, "success", output_path.name, None, payload)
-                return True, None
-            except Exception as exc:
-                if attempt >= self.args.max_retries:
-                    self._record_item(item.item_id, "failed", output_path.name, str(exc), payload)
-                    return False, str(exc)
-                sleep_secs = self.args.retry_backoff * (2**attempt) + random.uniform(0, 0.5)
-                print(f"⚠️ {item.item_id} 第 {attempt + 1} 次失敗：{exc}，{sleep_secs:.1f}s 後重試")
-                time.sleep(sleep_secs)
-
-        self._record_item(item.item_id, "failed", output_path.name, "unknown_error", payload)
-        return False, "unknown_error"
-
-    def _http_post_json(self, url: str, payload: Dict[str, Any]) -> Tuple[int, str]:
-        data = json.dumps(payload).encode("utf-8")
-        req = request.Request(
-            url,
-            data=data,
-            method="POST",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-        )
-        try:
-            with request.urlopen(req, timeout=self.args.timeout) as resp:
-                return resp.getcode(), resp.read().decode("utf-8", errors="replace")
-        except error.HTTPError as exc:
-            return exc.code, exc.read().decode("utf-8", errors="replace")
-
-    def _persist_manifest(self) -> None:
-        text = json.dumps(self.manifest, ensure_ascii=False, indent=2)
-        self.manifest_path.write_text(text, encoding="utf-8")
-        self.latest_manifest_path.write_text(text, encoding="utf-8")
-
-    def _record_item(
-        self,
-        item_id: str,
-        status: str,
-        output_file: str,
-        error_msg: Optional[str],
-        payload: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        self.manifest["items"][item_id] = {
-            "status": status,
-            "output": output_file,
-            "error": error_msg,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "payload": payload,
-        }
-
-    @staticmethod
-    def _is_retryable_status(code: int) -> bool:
-        return code == 429 or 500 <= code < 600
-
-    @staticmethod
-    def _to_float(value: Any) -> Optional[float]:
-        if value in (None, ""):
-            return None
-        return float(value)
-
-    @staticmethod
-    def _to_int(value: Any) -> Optional[int]:
-        if value in (None, ""):
-            return None
+def parse_pitch(value: str) -> int:
+    try:
         return int(value)
-
-    def _resolve_output_filename(self, item: TTSItem, index: int) -> str:
-        base = item.filename or f"{index:04d}_{item.item_id}"
-        base = self._sanitize_id(base)
-        ext = item.audio_format or self.args.default_format
-        return base if base.lower().endswith(f".{ext}") else f"{base}.{ext}"
-
-    @staticmethod
-    def _sanitize_id(value: str) -> str:
-        value = re.sub(r"[\\/:*?\"<>|\s]+", "_", value.strip())
-        value = value.strip("._")
-        return value or "item"
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "pitch must be an integer, for example 0, 1, or -1."
+        ) from exc
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="批次 TTS 轉換工具（支援 CSV/TXT/JSON）")
-    parser.add_argument("--input", required=True, help="輸入檔路徑（.csv/.json/.txt）")
-    parser.add_argument("--outdir", default="outputs", help="輸出資料夾")
-    parser.add_argument("--manifest-dir", default="manifests", help="manifest 輸出資料夾")
-    parser.add_argument("--log-dir", default="logs", help="log 輸出資料夾")
-
-    parser.add_argument("--default-model", default=DEFAULT_MODEL)
-    parser.add_argument("--default-voice-id", default=DEFAULT_VOICE_ID)
-    parser.add_argument("--default-speed", type=float, default=DEFAULT_SPEED)
-    parser.add_argument("--default-pitch", type=float, default=DEFAULT_PITCH)
-    parser.add_argument("--default-language-boost", default=DEFAULT_LANGUAGE_BOOST)
-    parser.add_argument("--default-format", default=DEFAULT_FORMAT)
-    parser.add_argument("--default-sample-rate", type=int, default=DEFAULT_SAMPLE_RATE)
-
-    parser.add_argument("--max-retries", type=int, default=3)
-    parser.add_argument("--retry-backoff", type=float, default=2.0)
-    parser.add_argument("--timeout", type=int, default=60)
-
-    parser.add_argument("--resume", action="store_true", help="從 latest_manifest.json 續跑")
-    parser.add_argument("--overwrite", action="store_true", help="覆蓋已存在音檔")
-    parser.add_argument("--dry-run", action="store_true", help="只驗證流程，不呼叫 API")
+    parser = argparse.ArgumentParser(
+        description="Batch synthesize UTF-8 text paragraphs into MP3 files."
+    )
+    parser.add_argument("--input", required=True, help="Path to a UTF-8 text file.")
+    parser.add_argument(
+        "--output-dir",
+        help="Directory for generated audio and manifest files. Defaults to outputs/<input>-<timestamp>/",
+    )
+    parser.add_argument("--voice-id", default=DEFAULT_VOICE_ID, help="MiniMax voice ID.")
+    parser.add_argument(
+        "--speed", type=float, default=DEFAULT_SPEED, help="Voice speed multiplier."
+    )
+    parser.add_argument(
+        "--pitch",
+        type=parse_pitch,
+        default=DEFAULT_PITCH,
+        help="Voice pitch adjustment. MiniMax expects an integer.",
+    )
+    parser.add_argument(
+        "--language-boost",
+        default=DEFAULT_LANGUAGE_BOOST,
+        help="language_boost payload value.",
+    )
+    parser.add_argument("--model", default=DEFAULT_MODEL, help="MiniMax model name.")
+    parser.add_argument(
+        "--sample-rate",
+        type=int,
+        default=DEFAULT_SAMPLE_RATE,
+        help="Output audio sample rate.",
+    )
+    parser.add_argument(
+        "--format",
+        choices=[DEFAULT_FORMAT],
+        default=DEFAULT_FORMAT,
+        help="Output audio format.",
+    )
+    parser.add_argument(
+        "--merge",
+        action="store_true",
+        help="Merge all successful segment files into merged.mp3 and delete the segment files.",
+    )
     return parser
 
 
-def main() -> int:
-    args = build_parser().parse_args()
-    runner = BatchTTSRunner(args)
-    return runner.run()
+def parse_segments(text: str) -> list[str]:
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not normalized:
+        return []
+
+    segments = re.split(r"\n\s*\n+", normalized)
+    return [segment.strip() for segment in segments if segment.strip()]
+
+
+def load_segments(input_path: Path) -> list[str]:
+    try:
+        raw_text = input_path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise TTSBatchError(f"Input file not found: {input_path}") from exc
+    except UnicodeDecodeError as exc:
+        raise TTSBatchError(f"Input file is not valid UTF-8: {input_path}") from exc
+
+    segments = parse_segments(raw_text)
+    if not segments:
+        raise TTSBatchError(f"No non-empty segments found in: {input_path}")
+    return segments
+
+
+def build_output_dir(input_path: Path, output_dir: str | None) -> Path:
+    if output_dir:
+        return Path(output_dir).expanduser()
+
+    timestamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S")
+    return Path("outputs") / f"{input_path.stem}-{timestamp}"
+
+
+def get_api_key() -> str:
+    api_key = os.getenv("MINIMAX_API_KEY", "").strip()
+    if api_key:
+        return api_key
+    raise TTSBatchError(
+        "MINIMAX_API_KEY is not set. Rotate the previously hard-coded key and export the new one before running."
+    )
+
+
+def extract_api_error_message(response: requests.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        body = response.text.strip()
+        return body or "Unknown API error"
+
+    if not isinstance(payload, dict):
+        return "Unexpected API error response"
+
+    base_resp = payload.get("base_resp")
+    if isinstance(base_resp, dict):
+        status_msg = base_resp.get("status_msg")
+        if status_msg:
+            return str(status_msg)
+
+    for key in ("message", "msg", "error"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        if isinstance(value, dict):
+            nested = value.get("message")
+            if isinstance(nested, str) and nested.strip():
+                return nested.strip()
+
+    return "Unknown API error"
+
+
+def decode_audio_hex(audio_hex: str) -> bytes:
+    try:
+        return bytes.fromhex(audio_hex)
+    except ValueError as exc:
+        raise TTSBatchError("Response audio payload was not valid hex data.") from exc
+
+
+def synthesize_segment(
+    text: str,
+    settings: TTSSettings,
+    api_key: str,
+    timeout: int = DEFAULT_TIMEOUT_SECONDS,
+    max_retries: int = DEFAULT_MAX_RETRIES,
+) -> bytes:
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": settings.model,
+        "text": text,
+        "language_boost": settings.language_boost,
+        "voice_setting": {
+            "voice_id": settings.voice_id,
+            "speed": settings.speed,
+            "pitch": settings.pitch,
+        },
+        "audio_setting": {
+            "format": settings.audio_format,
+            "sample_rate": settings.sample_rate,
+        },
+    }
+
+    last_error: Exception | None = None
+    for attempt in range(1, max_retries + 1):
+        retryable = False
+        try:
+            response = requests.post(
+                API_URL,
+                headers=headers,
+                json=payload,
+                timeout=timeout,
+            )
+        except requests.RequestException as exc:
+            last_error = RetryableTTSBatchError(f"Network error: {exc}")
+            retryable = True
+        else:
+            if response.status_code >= 500:
+                last_error = RetryableTTSBatchError(
+                    f"HTTP {response.status_code}: {extract_api_error_message(response)}"
+                )
+                retryable = True
+            elif response.status_code >= 400:
+                raise TTSBatchError(
+                    f"HTTP {response.status_code}: {extract_api_error_message(response)}"
+                )
+            else:
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    raise TTSBatchError("API returned invalid JSON.") from exc
+
+                base_resp = data.get("base_resp")
+                if isinstance(base_resp, dict) and base_resp.get("status_code") not in (
+                    None,
+                    0,
+                ):
+                    status_msg = base_resp.get("status_msg", "Unknown API error")
+                    raise TTSBatchError(str(status_msg))
+
+                audio_hex = data.get("data", {}).get("audio")
+                if not isinstance(audio_hex, str) or not audio_hex:
+                    raise TTSBatchError("API response did not include audio data.")
+
+                return decode_audio_hex(audio_hex)
+
+        if retryable and attempt < max_retries:
+            time.sleep(attempt)
+            continue
+
+        if last_error is not None:
+            raise last_error
+
+    raise TTSBatchError("TTS synthesis failed for an unknown reason.")
+
+
+def write_audio_file(output_path: Path, audio_bytes: bytes) -> None:
+    output_path.write_bytes(audio_bytes)
+
+
+def write_manifest(output_dir: Path, manifest: dict[str, Any]) -> None:
+    manifest_path = output_dir / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def write_errors_file(output_dir: Path, segments: list[dict[str, Any]]) -> None:
+    errors_path = output_dir / "errors.jsonl"
+    failed_segments = [segment for segment in segments if segment["status"] == "failed"]
+
+    with errors_path.open("w", encoding="utf-8") as handle:
+        for segment in failed_segments:
+            handle.write(json.dumps(segment, ensure_ascii=False) + "\n")
+
+
+def ensure_ffmpeg_available() -> str:
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path:
+        return ffmpeg_path
+    raise TTSBatchError("ffmpeg is not available in PATH.")
+
+
+def build_concat_list_file(output_dir: Path, audio_files: list[Path]) -> Path:
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        suffix=".txt",
+        prefix="ffmpeg-concat-",
+        dir=output_dir,
+        delete=False,
+    ) as handle:
+        for audio_file in audio_files:
+            handle.write(f"file '{audio_file.resolve().as_posix()}'\n")
+        return Path(handle.name)
+
+
+def merge_audio_files(output_dir: Path, audio_files: list[Path]) -> Path:
+    ffmpeg_path = ensure_ffmpeg_available()
+    for audio_file in audio_files:
+        if not audio_file.exists():
+            raise TTSBatchError(f"Missing audio segment for merge: {audio_file.name}")
+
+    concat_list_path = build_concat_list_file(output_dir, audio_files)
+    merged_output_path = output_dir / "merged.mp3"
+    try:
+        completed = subprocess.run(
+            [
+                ffmpeg_path,
+                "-y",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(concat_list_path),
+                "-c",
+                "copy",
+                str(merged_output_path),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    finally:
+        concat_list_path.unlink(missing_ok=True)
+
+    if completed.returncode != 0:
+        error_output = (completed.stderr or completed.stdout or "").strip()
+        raise TTSBatchError(error_output or "ffmpeg merge failed.")
+
+    if not merged_output_path.exists() or merged_output_path.stat().st_size <= 0:
+        raise TTSBatchError("ffmpeg merge did not produce a valid merged.mp3.")
+
+    return merged_output_path
+
+
+def delete_segment_files(audio_files: list[Path]) -> tuple[int, list[str]]:
+    deleted_count = 0
+    cleanup_errors: list[str] = []
+    for audio_file in audio_files:
+        try:
+            audio_file.unlink()
+            deleted_count += 1
+        except FileNotFoundError:
+            cleanup_errors.append(f"Missing segment during cleanup: {audio_file.name}")
+        except OSError as exc:
+            cleanup_errors.append(f"Failed to delete {audio_file.name}: {exc}")
+    return deleted_count, cleanup_errors
+
+
+def build_settings(args: argparse.Namespace) -> TTSSettings:
+    return TTSSettings(
+        model=args.model,
+        language_boost=args.language_boost,
+        voice_id=args.voice_id,
+        speed=args.speed,
+        pitch=args.pitch,
+        sample_rate=args.sample_rate,
+        audio_format=args.format,
+    )
+
+
+def run_batch(args: argparse.Namespace) -> int:
+    input_path = Path(args.input).expanduser()
+    api_key = get_api_key()
+    settings = build_settings(args)
+    segments = load_segments(input_path)
+    output_dir = build_output_dir(input_path, args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"Loaded {len(segments)} segments from {input_path}")
+    print(f"Output directory: {output_dir.resolve()}")
+
+    index_width = max(4, len(str(len(segments))))
+    results: list[dict[str, Any]] = []
+    success_count = 0
+    failure_count = 0
+    generated_audio_files: list[Path] = []
+
+    for index, text in enumerate(segments, start=1):
+        filename = f"{index:0{index_width}d}.{settings.audio_format}"
+        output_path = output_dir / filename
+        print(f"[{index}/{len(segments)}] Synthesizing {filename} ...")
+
+        try:
+            audio_bytes = synthesize_segment(text, settings, api_key)
+        except TTSBatchError as exc:
+            failure_count += 1
+            results.append(
+                {
+                    "index": index,
+                    "text": text,
+                    "output_file": None,
+                    "status": "failed",
+                    "error": str(exc),
+                }
+            )
+            print(
+                f"[{index}/{len(segments)}] Failed: {exc}",
+                file=sys.stderr,
+            )
+            continue
+
+        write_audio_file(output_path, audio_bytes)
+        generated_audio_files.append(output_path)
+        success_count += 1
+        results.append(
+            {
+                "index": index,
+                "text": text,
+                "output_file": filename,
+                "status": "success",
+                "error": None,
+            }
+        )
+        print(f"[{index}/{len(segments)}] Wrote {filename}")
+
+    merged_output_file: str | None = None
+    merge_status = "skipped"
+    merge_error: str | None = None
+    cleanup_status = "skipped"
+    deleted_segment_files = 0
+
+    if failure_count == 0 and args.merge:
+        print("All segments generated successfully. Starting merge to merged.mp3 ...")
+        try:
+            merged_output_path = merge_audio_files(output_dir, generated_audio_files)
+        except TTSBatchError as exc:
+            merge_status = "failed"
+            merge_error = str(exc)
+            print(f"Merge failed: {exc}", file=sys.stderr)
+        else:
+            merge_status = "success"
+            merged_output_file = merged_output_path.name
+            print(f"Merge succeeded: {merged_output_path}")
+            deleted_segment_files, cleanup_errors = delete_segment_files(
+                generated_audio_files
+            )
+            if cleanup_errors:
+                cleanup_status = "failed"
+                merge_error = "; ".join(cleanup_errors)
+                print(
+                    f"Cleanup failed after merge: {merge_error}",
+                    file=sys.stderr,
+                )
+            else:
+                cleanup_status = "success"
+                print(
+                    f"Deleted {deleted_segment_files} segment files after successful merge."
+                )
+    elif failure_count == 0:
+        print("Merge not requested. Keeping segment files.")
+    else:
+        print("Skipping merge because one or more segments failed.")
+
+    manifest = {
+        "input_file": str(input_path.resolve()),
+        "created_at": datetime.now().astimezone().isoformat(),
+        "settings": asdict(settings),
+        "summary": {
+            "total_segments": len(segments),
+            "succeeded": success_count,
+            "failed": failure_count,
+            "output_dir": str(output_dir.resolve()),
+            "merged_output_file": merged_output_file,
+            "merge_status": merge_status,
+            "deleted_segment_files": deleted_segment_files,
+            "cleanup_status": cleanup_status,
+            "merge_error": merge_error,
+        },
+        "segments": results,
+    }
+    write_manifest(output_dir, manifest)
+    write_errors_file(output_dir, results)
+
+    print(
+        f"Finished. Success: {success_count}, Failed: {failure_count}, Manifest: {output_dir / 'manifest.json'}"
+    )
+    if failure_count > 0:
+        return 1
+    if args.merge and merge_status != "success":
+        return 1
+    if args.merge and cleanup_status not in ("success", "skipped"):
+        return 1
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        return run_batch(args)
+    except TTSBatchError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
