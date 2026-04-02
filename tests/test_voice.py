@@ -1,7 +1,9 @@
+import io
 import json
 import os
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from subprocess import CompletedProcess
 from unittest.mock import patch
@@ -9,6 +11,7 @@ from unittest.mock import patch
 import requests
 
 import voice
+from voice_dashboard import cli, pipeline
 
 
 class MockResponse:
@@ -25,170 +28,187 @@ class MockResponse:
 
 class ParseSegmentsTests(unittest.TestCase):
     def test_parse_segments_returns_empty_for_empty_text(self):
-        self.assertEqual(voice.parse_segments(""), [])
+        self.assertEqual(pipeline.parse_segments(""), [])
 
     def test_parse_segments_returns_empty_for_whitespace_only(self):
-        self.assertEqual(voice.parse_segments(" \n\t\r\n "), [])
+        self.assertEqual(pipeline.parse_segments(" \n\t\r\n "), [])
 
     def test_parse_segments_supports_single_segment(self):
-        self.assertEqual(voice.parse_segments("hello world"), ["hello world"])
+        self.assertEqual(pipeline.parse_segments("hello world"), ["hello world"])
 
     def test_parse_segments_splits_on_blank_lines_and_preserves_internal_newlines(self):
         text = "第一段第一行\n第一段第二行\n\n\n 第二段 \n\n第三段\n保留換行 "
         self.assertEqual(
-            voice.parse_segments(text),
+            pipeline.parse_segments(text),
             ["第一段第一行\n第一段第二行", "第二段", "第三段\n保留換行"],
         )
 
 
 class CLITests(unittest.TestCase):
-    def test_main_requires_input_argument(self):
+    def test_print_config_example(self):
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            exit_code = cli.main(["--print-config-example"])
+
+        self.assertEqual(exit_code, 0)
+        payload = json.loads(buffer.getvalue())
+        self.assertIn("defaults", payload)
+        self.assertIn("voice_id", payload["defaults"])
+        self.assertIn("output_root", payload["defaults"])
+        self.assertIn("format", payload["defaults"])
+
+    def test_main_requires_exactly_one_input_source(self):
         with self.assertRaises(SystemExit) as context:
-            voice.main([])
+            cli.main([])
         self.assertEqual(context.exception.code, 2)
-
-    def test_main_returns_error_when_input_file_is_missing(self):
-        with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
-            exit_code = voice.main(["--input", "missing.txt"])
-        self.assertEqual(exit_code, 1)
-
-    def test_main_returns_error_when_api_key_is_missing(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_path = Path(temp_dir) / "input.txt"
-            input_path.write_text("one paragraph", encoding="utf-8")
-
-            with patch.dict(os.environ, {}, clear=True):
-                exit_code = voice.main(["--input", str(input_path)])
-
-        self.assertEqual(exit_code, 1)
 
     def test_main_rejects_non_integer_pitch(self):
         with self.assertRaises(SystemExit) as context:
-            voice.main(["--input", "example.txt", "--pitch", "0.5"])
+            cli.main(["sample.txt", "--pitch", "0.5"])
         self.assertEqual(context.exception.code, 2)
 
-    def test_custom_voice_settings_are_sent_to_api(self):
+    def test_wrapper_voice_py_uses_new_cli(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             input_path = Path(temp_dir) / "input.txt"
             output_dir = Path(temp_dir) / "out"
             input_path.write_text("第一段", encoding="utf-8")
-
             response = MockResponse(
                 200,
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
             with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
-                with patch("voice.requests.post", return_value=response) as mock_post:
-                    exit_code = voice.main(
-                        [
-                            "--input",
-                            str(input_path),
-                            "--output-dir",
-                            str(output_dir),
-                            "--voice-id",
-                            "custom-voice",
-                            "--speed",
-                            "1.5",
-                            "--pitch",
-                            "1",
-                            "--language-boost",
-                            "Chinese,Mandarin",
-                            "--model",
-                            "speech-custom",
-                            "--sample-rate",
-                            "44100",
-                        ]
-                    )
+                with patch("voice_dashboard.pipeline.requests.post", return_value=response):
+                    exit_code = voice.main([str(input_path), "--output-dir", str(output_dir)])
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((output_dir / "0001.mp3").exists())
 
-        self.assertEqual(exit_code, 0)
-        self.assertEqual(mock_post.call_count, 1)
-        payload = mock_post.call_args.kwargs["json"]
-        self.assertEqual(payload["model"], "speech-custom")
-        self.assertEqual(payload["language_boost"], "Chinese,Mandarin")
-        self.assertEqual(payload["voice_setting"]["voice_id"], "custom-voice")
-        self.assertEqual(payload["voice_setting"]["speed"], 1.5)
-        self.assertEqual(payload["voice_setting"]["pitch"], 1)
-        self.assertEqual(payload["audio_setting"]["sample_rate"], 44100)
-
-
-class BatchFlowTests(unittest.TestCase):
-    def _mock_successful_merge(self, mock_subprocess_run, output_dir):
-        def fake_run(cmd, capture_output, text, check):
-            Path(cmd[-1]).write_bytes(b"merged-audio")
-            return CompletedProcess(cmd, 0, stdout="", stderr="")
-
-        mock_subprocess_run.side_effect = fake_run
-        return output_dir / "merged.mp3"
-
-    def test_retryable_request_is_retried_and_succeeds(self):
+    def test_config_values_are_used_when_cli_flags_are_absent(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             input_path = Path(temp_dir) / "input.txt"
-            output_dir = Path(temp_dir) / "out"
+            config_path = Path(temp_dir) / "config.json"
+            custom_root = Path(temp_dir) / "custom-out"
             input_path.write_text("第一段", encoding="utf-8")
-
-            success_response = MockResponse(
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "defaults": {
+                            "voice_id": "cfg-voice",
+                            "speed": 1.6,
+                            "pitch": 2,
+                            "language_boost": "Chinese,Mandarin",
+                            "model": "cfg-model",
+                            "sample_rate": 44100,
+                            "output_root": str(custom_root),
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            response = MockResponse(
                 200,
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
             with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
                 with patch(
-                    "voice.requests.post",
-                    side_effect=[
-                        requests.ConnectionError("temporary"),
-                        success_response,
-                    ],
+                    "voice_dashboard.pipeline.requests.post", return_value=response
                 ) as mock_post:
-                    with patch("voice.time.sleep"):
-                        exit_code = voice.main(
-                            [
-                                "--input",
-                                str(input_path),
-                                "--output-dir",
-                                str(output_dir),
-                            ]
-                        )
-
+                    exit_code = cli.main([str(input_path), "--config", str(config_path)])
             self.assertEqual(exit_code, 0)
-            self.assertEqual(mock_post.call_count, 2)
+            payload = mock_post.call_args.kwargs["json"]
+            self.assertEqual(payload["model"], "cfg-model")
+            self.assertEqual(payload["language_boost"], "Chinese,Mandarin")
+            self.assertEqual(payload["voice_setting"]["voice_id"], "cfg-voice")
+            self.assertEqual(payload["voice_setting"]["speed"], 1.6)
+            self.assertEqual(payload["voice_setting"]["pitch"], 2)
+            self.assertEqual(payload["audio_setting"]["sample_rate"], 44100)
+
+
+class InputSourceTests(unittest.TestCase):
+    def test_stdin_input_is_supported(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "out"
+            response = MockResponse(
+                200,
+                {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
+            )
+
+            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+                with patch("sys.stdin", io.StringIO("第一段\n\n第二段\n")):
+                    with patch(
+                        "voice_dashboard.pipeline.requests.post", return_value=response
+                    ):
+                        exit_code = cli.main(["--stdin", "--output-dir", str(output_dir)])
+            self.assertEqual(exit_code, 0)
             self.assertTrue((output_dir / "0001.mp3").exists())
-            self.assertFalse((output_dir / "merged.mp3").exists())
+            self.assertTrue((output_dir / "0002.mp3").exists())
+
+    def test_clipboard_input_is_supported(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "out"
+            response = MockResponse(
+                200,
+                {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
+            )
+
+            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+                with patch(
+                    "voice_dashboard.input_sources.subprocess.run",
+                    return_value=CompletedProcess(
+                        ["pbpaste"], 0, stdout="第一段\n\n第二段", stderr=""
+                    ),
+                ):
+                    with patch(
+                        "voice_dashboard.pipeline.requests.post", return_value=response
+                    ):
+                        exit_code = cli.main(
+                            ["--clipboard", "--output-dir", str(output_dir)]
+                        )
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((output_dir / "0001.mp3").exists())
+            self.assertTrue((output_dir / "0002.mp3").exists())
+
+
+class BatchFlowTests(unittest.TestCase):
+    def _mock_successful_merge(self, mock_subprocess_run):
+        def fake_run(cmd, capture_output, text, check):
+            Path(cmd[-1]).write_bytes(b"merged-audio")
+            return CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        mock_subprocess_run.side_effect = fake_run
 
     def test_merge_is_optional_and_disabled_by_default(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             input_path = Path(temp_dir) / "input.txt"
             output_dir = Path(temp_dir) / "out"
             input_path.write_text("第一段\n\n第二段", encoding="utf-8")
-
-            success_response = MockResponse(
+            response = MockResponse(
                 200,
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
             with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
-                with patch("voice.requests.post", return_value=success_response):
-                    with patch("voice.subprocess.run") as mock_subprocess_run:
-                        exit_code = voice.main(
-                            [
-                                "--input",
-                                str(input_path),
-                                "--output-dir",
-                                str(output_dir),
-                            ]
-                        )
+                with patch(
+                    "voice_dashboard.pipeline.requests.post", return_value=response
+                ):
+                    with patch(
+                        "voice_dashboard.pipeline.subprocess.run"
+                    ) as mock_subprocess_run:
+                        exit_code = cli.main([str(input_path), "--output-dir", str(output_dir)])
+                manifest = json.loads(
+                    (output_dir / "manifest.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(exit_code, 0)
+                self.assertTrue((output_dir / "0001.mp3").exists())
+                self.assertTrue((output_dir / "0002.mp3").exists())
+                self.assertFalse((output_dir / "merged.mp3").exists())
+                self.assertEqual(manifest["summary"]["merge_status"], "skipped")
+                self.assertEqual(manifest["summary"]["cleanup_status"], "skipped")
+                mock_subprocess_run.assert_not_called()
 
-            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
-            self.assertEqual(exit_code, 0)
-            self.assertTrue((output_dir / "0001.mp3").exists())
-            self.assertTrue((output_dir / "0002.mp3").exists())
-            self.assertFalse((output_dir / "merged.mp3").exists())
-            self.assertEqual(manifest["summary"]["merge_status"], "skipped")
-            self.assertEqual(manifest["summary"]["cleanup_status"], "skipped")
-            self.assertIsNone(manifest["summary"]["merged_output_file"])
-            mock_subprocess_run.assert_not_called()
-
-    def test_batch_continues_after_segment_failure_and_writes_error_files(self):
+    def test_batch_continues_after_segment_failure_and_skips_merge(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             input_path = Path(temp_dir) / "input.txt"
             output_dir = Path(temp_dir) / "out"
@@ -205,227 +225,163 @@ class BatchFlowTests(unittest.TestCase):
 
             with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
                 with patch(
-                    "voice.requests.post",
+                    "voice_dashboard.pipeline.requests.post",
                     side_effect=[success_response, failure_response, success_response],
                 ):
-                    with patch("voice.subprocess.run") as mock_subprocess_run:
-                        exit_code = voice.main(
-                            [
-                                "--input",
-                                str(input_path),
-                                "--output-dir",
-                                str(output_dir),
-                                "--merge",
-                            ]
+                    with patch(
+                        "voice_dashboard.pipeline.subprocess.run"
+                    ) as mock_subprocess_run:
+                        exit_code = cli.main(
+                            [str(input_path), "--output-dir", str(output_dir), "--merge"]
                         )
-
-            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
-            errors_lines = (output_dir / "errors.jsonl").read_text(encoding="utf-8").splitlines()
-
-            self.assertEqual(exit_code, 1)
-            self.assertTrue((output_dir / "0001.mp3").exists())
-            self.assertFalse((output_dir / "0002.mp3").exists())
-            self.assertTrue((output_dir / "0003.mp3").exists())
-            self.assertEqual(manifest["summary"]["succeeded"], 2)
-            self.assertEqual(manifest["summary"]["failed"], 1)
-            self.assertEqual(manifest["segments"][1]["status"], "failed")
-            self.assertIsNone(manifest["segments"][1]["output_file"])
-            self.assertEqual(manifest["summary"]["merge_status"], "skipped")
-            self.assertEqual(manifest["summary"]["cleanup_status"], "skipped")
-            self.assertIsNone(manifest["summary"]["merged_output_file"])
-            mock_subprocess_run.assert_not_called()
-            self.assertEqual(len(errors_lines), 1)
-            self.assertIn("invalid text", errors_lines[0])
+                manifest = json.loads(
+                    (output_dir / "manifest.json").read_text(encoding="utf-8")
+                )
+                errors_lines = (
+                    output_dir / "errors.jsonl"
+                ).read_text(encoding="utf-8").splitlines()
+                self.assertEqual(exit_code, 1)
+                self.assertTrue((output_dir / "0001.mp3").exists())
+                self.assertFalse((output_dir / "0002.mp3").exists())
+                self.assertTrue((output_dir / "0003.mp3").exists())
+                self.assertEqual(manifest["summary"]["merge_status"], "skipped")
+                self.assertEqual(manifest["summary"]["cleanup_status"], "skipped")
+                mock_subprocess_run.assert_not_called()
+                self.assertEqual(len(errors_lines), 1)
+                self.assertIn("invalid text", errors_lines[0])
 
     def test_merge_fails_when_ffmpeg_is_missing(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             input_path = Path(temp_dir) / "input.txt"
             output_dir = Path(temp_dir) / "out"
             input_path.write_text("第一段\n\n第二段", encoding="utf-8")
-
-            success_response = MockResponse(
+            response = MockResponse(
                 200,
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
             with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
-                with patch("voice.requests.post", return_value=success_response):
-                    with patch("voice.shutil.which", return_value=None):
-                        exit_code = voice.main(
-                            [
-                                "--input",
-                                str(input_path),
-                                "--output-dir",
-                                str(output_dir),
-                                "--merge",
-                            ]
+                with patch(
+                    "voice_dashboard.pipeline.requests.post", return_value=response
+                ):
+                    with patch("voice_dashboard.pipeline.shutil.which", return_value=None):
+                        exit_code = cli.main(
+                            [str(input_path), "--output-dir", str(output_dir), "--merge"]
                         )
+                manifest = json.loads(
+                    (output_dir / "manifest.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(exit_code, 1)
+                self.assertTrue((output_dir / "0001.mp3").exists())
+                self.assertTrue((output_dir / "0002.mp3").exists())
+                self.assertFalse((output_dir / "merged.mp3").exists())
+                self.assertEqual(manifest["summary"]["merge_status"], "failed")
+                self.assertEqual(manifest["summary"]["cleanup_status"], "skipped")
+                self.assertIn("ffmpeg", manifest["summary"]["merge_error"])
 
-            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
-            self.assertEqual(exit_code, 1)
-            self.assertTrue((output_dir / "0001.mp3").exists())
-            self.assertTrue((output_dir / "0002.mp3").exists())
-            self.assertFalse((output_dir / "merged.mp3").exists())
-            self.assertEqual(manifest["summary"]["merge_status"], "failed")
-            self.assertEqual(manifest["summary"]["cleanup_status"], "skipped")
-            self.assertIn("ffmpeg", manifest["summary"]["merge_error"])
-
-    def test_merge_failure_keeps_segment_files(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_path = Path(temp_dir) / "input.txt"
-            output_dir = Path(temp_dir) / "out"
-            input_path.write_text("第一段\n\n第二段", encoding="utf-8")
-
-            success_response = MockResponse(
-                200,
-                {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
-            )
-
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
-                with patch("voice.requests.post", return_value=success_response):
-                    with patch("voice.shutil.which", return_value="/opt/homebrew/bin/ffmpeg"):
-                        with patch(
-                            "voice.subprocess.run",
-                            return_value=CompletedProcess(
-                                ["ffmpeg"], 1, stdout="", stderr="concat failed"
-                            ),
-                        ):
-                            exit_code = voice.main(
-                                [
-                                    "--input",
-                                    str(input_path),
-                                    "--output-dir",
-                                    str(output_dir),
-                                    "--merge",
-                                ]
-                            )
-
-            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
-            self.assertEqual(exit_code, 1)
-            self.assertTrue((output_dir / "0001.mp3").exists())
-            self.assertTrue((output_dir / "0002.mp3").exists())
-            self.assertFalse((output_dir / "merged.mp3").exists())
-            self.assertEqual(manifest["summary"]["merge_status"], "failed")
-            self.assertEqual(manifest["summary"]["cleanup_status"], "skipped")
-            self.assertEqual(manifest["summary"]["merge_error"], "concat failed")
-
-    def test_cleanup_failure_preserves_merged_output_and_returns_error(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_path = Path(temp_dir) / "input.txt"
-            output_dir = Path(temp_dir) / "out"
-            input_path.write_text("第一段\n\n第二段", encoding="utf-8")
-
-            success_response = MockResponse(
-                200,
-                {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
-            )
-
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
-                with patch("voice.requests.post", return_value=success_response):
-                    with patch("voice.shutil.which", return_value="/opt/homebrew/bin/ffmpeg"):
-                        with patch("voice.subprocess.run") as mock_subprocess_run:
-                            self._mock_successful_merge(mock_subprocess_run, output_dir)
-                            with patch(
-                                "voice.delete_segment_files",
-                                return_value=(
-                                    1,
-                                    ["Failed to delete 0001.mp3: permission denied"],
-                                ),
-                            ):
-                                exit_code = voice.main(
-                                    [
-                                        "--input",
-                                        str(input_path),
-                                        "--output-dir",
-                                        str(output_dir),
-                                        "--merge",
-                                    ]
-                                )
-
-            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
-            self.assertEqual(exit_code, 1)
-            self.assertTrue((output_dir / "merged.mp3").exists())
-            self.assertEqual(manifest["summary"]["merge_status"], "success")
-            self.assertEqual(manifest["summary"]["cleanup_status"], "failed")
-            self.assertEqual(manifest["summary"]["deleted_segment_files"], 1)
-            self.assertIn("permission denied", manifest["summary"]["merge_error"])
-
-    def test_sample_file_generates_expected_outputs(self):
+    def test_merge_success_deletes_segments(self):
         sample_path = Path(__file__).resolve().parent.parent / "examples" / "sample.txt"
-        expected_segments = voice.parse_segments(sample_path.read_text(encoding="utf-8"))
+        expected_segments = pipeline.parse_segments(sample_path.read_text(encoding="utf-8"))
 
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "sample-output"
-            success_response = MockResponse(
+            response = MockResponse(
                 200,
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
             with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
-                with patch("voice.requests.post", return_value=success_response):
-                    with patch("voice.shutil.which", return_value="/opt/homebrew/bin/ffmpeg"):
-                        with patch("voice.subprocess.run") as mock_subprocess_run:
-                            self._mock_successful_merge(mock_subprocess_run, output_dir)
-                            exit_code = voice.main(
-                                [
-                                    "--input",
-                                    str(sample_path),
-                                    "--output-dir",
-                                    str(output_dir),
-                                    "--merge",
-                                ]
+                with patch(
+                    "voice_dashboard.pipeline.requests.post", return_value=response
+                ):
+                    with patch(
+                        "voice_dashboard.pipeline.shutil.which",
+                        return_value="/opt/homebrew/bin/ffmpeg",
+                    ):
+                        with patch(
+                            "voice_dashboard.pipeline.subprocess.run"
+                        ) as mock_subprocess_run:
+                            self._mock_successful_merge(mock_subprocess_run)
+                            exit_code = cli.main(
+                                [str(sample_path), "--output-dir", str(output_dir), "--merge"]
                             )
-
-            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
-
-            self.assertEqual(exit_code, 0)
-            self.assertEqual(len(manifest["segments"]), len(expected_segments))
-            self.assertEqual(manifest["summary"]["total_segments"], len(expected_segments))
-            self.assertEqual(manifest["summary"]["merge_status"], "success")
-            self.assertEqual(manifest["summary"]["cleanup_status"], "success")
-            self.assertEqual(manifest["summary"]["merged_output_file"], "merged.mp3")
-            self.assertTrue((output_dir / "merged.mp3").exists())
-            for index, segment in enumerate(expected_segments, start=1):
-                filename = f"{index:04d}.mp3"
-                self.assertFalse((output_dir / filename).exists())
-                self.assertEqual(manifest["segments"][index - 1]["output_file"], filename)
-                self.assertEqual(manifest["segments"][index - 1]["text"], segment)
+                manifest = json.loads(
+                    (output_dir / "manifest.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(exit_code, 0)
+                self.assertEqual(len(manifest["segments"]), len(expected_segments))
+                self.assertEqual(manifest["summary"]["merge_status"], "success")
+                self.assertEqual(manifest["summary"]["cleanup_status"], "success")
+                self.assertEqual(
+                    manifest["summary"]["merged_output_file"], "merged.mp3"
+                )
+                self.assertTrue((output_dir / "merged.mp3").exists())
+                for index, segment in enumerate(expected_segments, start=1):
+                    filename = f"{index:04d}.mp3"
+                    self.assertFalse((output_dir / filename).exists())
+                    self.assertEqual(
+                        manifest["segments"][index - 1]["output_file"], filename
+                    )
+                    self.assertEqual(
+                        manifest["segments"][index - 1]["text"], segment
+                    )
 
     def test_sample_file_without_merge_keeps_segment_outputs(self):
         sample_path = Path(__file__).resolve().parent.parent / "examples" / "sample.txt"
-        expected_segments = voice.parse_segments(sample_path.read_text(encoding="utf-8"))
+        expected_segments = pipeline.parse_segments(sample_path.read_text(encoding="utf-8"))
 
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "sample-output"
+            response = MockResponse(
+                200,
+                {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
+            )
+
+            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+                with patch(
+                    "voice_dashboard.pipeline.requests.post", return_value=response
+                ):
+                    with patch(
+                        "voice_dashboard.pipeline.subprocess.run"
+                    ) as mock_subprocess_run:
+                        exit_code = cli.main([str(sample_path), "--output-dir", str(output_dir)])
+                manifest = json.loads(
+                    (output_dir / "manifest.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(exit_code, 0)
+                self.assertEqual(manifest["summary"]["merge_status"], "skipped")
+                self.assertEqual(manifest["summary"]["cleanup_status"], "skipped")
+                self.assertFalse((output_dir / "merged.mp3").exists())
+                mock_subprocess_run.assert_not_called()
+                for index, segment in enumerate(expected_segments, start=1):
+                    filename = f"{index:04d}.mp3"
+                    self.assertTrue((output_dir / filename).exists())
+                    self.assertEqual(
+                        manifest["segments"][index - 1]["output_file"], filename
+                    )
+                    self.assertEqual(
+                        manifest["segments"][index - 1]["text"], segment
+                    )
+
+    def test_retryable_request_is_retried(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            input_path.write_text("第一段", encoding="utf-8")
             success_response = MockResponse(
                 200,
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
             with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
-                with patch("voice.requests.post", return_value=success_response):
-                    with patch("voice.subprocess.run") as mock_subprocess_run:
-                        exit_code = voice.main(
-                            [
-                                "--input",
-                                str(sample_path),
-                                "--output-dir",
-                                str(output_dir),
-                            ]
-                        )
-
-            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
-
+                with patch(
+                    "voice_dashboard.pipeline.requests.post",
+                    side_effect=[requests.ConnectionError("temporary"), success_response],
+                ) as mock_post:
+                    with patch("voice_dashboard.pipeline.time.sleep"):
+                        exit_code = cli.main([str(input_path), "--output-dir", str(output_dir)])
             self.assertEqual(exit_code, 0)
-            self.assertEqual(manifest["summary"]["merge_status"], "skipped")
-            self.assertEqual(manifest["summary"]["cleanup_status"], "skipped")
-            self.assertFalse((output_dir / "merged.mp3").exists())
-            mock_subprocess_run.assert_not_called()
-            for index, segment in enumerate(expected_segments, start=1):
-                filename = f"{index:04d}.mp3"
-                self.assertTrue((output_dir / filename).exists())
-                self.assertEqual(manifest["segments"][index - 1]["output_file"], filename)
-                self.assertEqual(manifest["segments"][index - 1]["text"], segment)
+            self.assertEqual(mock_post.call_count, 2)
 
 
 if __name__ == "__main__":

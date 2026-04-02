@@ -1,0 +1,14 @@
+pyproject.toml
+tests/test_voice.py
+voice_dashboard/__init__.py
+voice_dashboard/cli.py
+voice_dashboard/config.py
+voice_dashboard/defaults.py
+voice_dashboard/input_sources.py
+voice_dashboard/pipeline.py
+voice_dashboard.egg-info/PKG-INFO
+voice_dashboard.egg-info/SOURCES.txt
+voice_dashboard.egg-info/dependency_links.txt
+voice_dashboard.egg-info/entry_points.txt
+voice_dashboard.egg-info/requires.txt
+voice_dashboard.egg-info/top_level.txt
