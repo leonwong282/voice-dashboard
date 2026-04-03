@@ -69,6 +69,7 @@ pbpaste | ttsrun --stdin --merge
 ## 📖 Documentation
 
 - Full usage guide: [docs/USAGE.md](docs/USAGE.md)
+- Product roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

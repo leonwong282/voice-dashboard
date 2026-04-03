@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Documentation language policy clarified: README is bilingual (English + Traditional Chinese), while usage documentation is maintained in English.
 
+### Added
+- Product roadmap at `docs/ROADMAP.md`, covering the path from repository-local utility to distributable CLI product.
+
 ## [0.1.0] - 2026-04-03
 
 ### Added
