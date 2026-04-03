@@ -18,15 +18,16 @@ from voice_dashboard.defaults import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_TIMEOUT_SECONDS,
 )
+from voice_dashboard.errors import (
+    ApiError,
+    AuthenticationError,
+    DependencyError,
+    ExitCode,
+    RetryableApiError,
+    TTSBatchError,
+    exit_code_for_error,
+)
 from voice_dashboard.input_sources import InputSource
-
-
-class TTSBatchError(RuntimeError):
-    """Raised when the TTS batch job cannot continue."""
-
-
-class RetryableTTSBatchError(TTSBatchError):
-    """Raised for failures that are safe to retry."""
 
 
 @dataclass(frozen=True)
@@ -60,8 +61,8 @@ def get_api_key() -> str:
     api_key = os.getenv("MINIMAX_API_KEY", "").strip()
     if api_key:
         return api_key
-    raise TTSBatchError(
-        "MINIMAX_API_KEY is not set. Rotate the previously hard-coded key and export the new one before running."
+    raise AuthenticationError(
+        "MINIMAX_API_KEY is not set. Export it before running ttsrun, or use --doctor to inspect your environment."
     )
 
 
@@ -97,7 +98,7 @@ def decode_audio_hex(audio_hex: str) -> bytes:
     try:
         return bytes.fromhex(audio_hex)
     except ValueError as exc:
-        raise TTSBatchError("Response audio payload was not valid hex data.") from exc
+        raise ApiError("API response audio payload was not valid hex data.") from exc
 
 
 def synthesize_segment(
@@ -126,7 +127,7 @@ def synthesize_segment(
         },
     }
 
-    last_error: Exception | None = None
+    last_error: ApiError | None = None
     for attempt in range(1, max_retries + 1):
         retryable = False
         try:
@@ -137,23 +138,28 @@ def synthesize_segment(
                 timeout=timeout,
             )
         except requests.RequestException as exc:
-            last_error = RetryableTTSBatchError(f"Network error: {exc}")
+            last_error = RetryableApiError(f"Network error: {exc}")
             retryable = True
         else:
             if response.status_code >= 500:
-                last_error = RetryableTTSBatchError(
+                last_error = RetryableApiError(
                     f"HTTP {response.status_code}: {extract_api_error_message(response)}"
                 )
                 retryable = True
             elif response.status_code >= 400:
-                raise TTSBatchError(
+                message = (
                     f"HTTP {response.status_code}: {extract_api_error_message(response)}"
                 )
+                if response.status_code in (401, 403):
+                    raise AuthenticationError(
+                        f"{message}. Check MINIMAX_API_KEY and account permissions."
+                    )
+                raise ApiError(message)
             else:
                 try:
                     data = response.json()
                 except ValueError as exc:
-                    raise TTSBatchError("API returned invalid JSON.") from exc
+                    raise ApiError("API returned invalid JSON.") from exc
 
                 base_resp = data.get("base_resp")
                 if isinstance(base_resp, dict) and base_resp.get("status_code") not in (
@@ -161,11 +167,11 @@ def synthesize_segment(
                     0,
                 ):
                     status_msg = base_resp.get("status_msg", "Unknown API error")
-                    raise TTSBatchError(str(status_msg))
+                    raise ApiError(str(status_msg))
 
                 audio_hex = data.get("data", {}).get("audio")
                 if not isinstance(audio_hex, str) or not audio_hex:
-                    raise TTSBatchError("API response did not include audio data.")
+                    raise ApiError("API response did not include audio data.")
 
                 return decode_audio_hex(audio_hex)
 
@@ -176,7 +182,7 @@ def synthesize_segment(
         if last_error is not None:
             raise last_error
 
-    raise TTSBatchError("TTS synthesis failed for an unknown reason.")
+    raise ApiError("TTS synthesis failed for an unknown reason.")
 
 
 def write_audio_file(output_path: Path, audio_bytes: bytes) -> None:
@@ -201,10 +207,16 @@ def write_errors_file(output_dir: Path, segments: list[dict[str, Any]]) -> None:
 
 
 def ensure_ffmpeg_available() -> str:
-    ffmpeg_path = shutil.which("ffmpeg")
+    ffmpeg_path = find_ffmpeg_path()
     if ffmpeg_path:
         return ffmpeg_path
-    raise TTSBatchError("ffmpeg is not available in PATH.")
+    raise DependencyError(
+        "ffmpeg is not available in PATH. Install ffmpeg before using --merge."
+    )
+
+
+def find_ffmpeg_path() -> str | None:
+    return shutil.which("ffmpeg")
 
 
 def build_concat_list_file(output_dir: Path, audio_files: list[Path]) -> Path:
@@ -253,10 +265,10 @@ def merge_audio_files(output_dir: Path, audio_files: list[Path]) -> Path:
 
     if completed.returncode != 0:
         error_output = (completed.stderr or completed.stdout or "").strip()
-        raise TTSBatchError(error_output or "ffmpeg merge failed.")
+        raise DependencyError(error_output or "ffmpeg merge failed.")
 
     if not merged_output_path.exists() or merged_output_path.stat().st_size <= 0:
-        raise TTSBatchError("ffmpeg merge did not produce a valid merged.mp3.")
+        raise DependencyError("ffmpeg merge did not produce a valid merged.mp3.")
 
     return merged_output_path
 
@@ -296,25 +308,28 @@ def build_output_dir(
     return output_root.expanduser() / date_part / f"{timestamp}-{label}"
 
 
-def open_output_dir(output_dir: Path) -> None:
-    launcher = None
+def detect_output_dir_opener() -> str | None:
     if shutil.which("open"):
-        launcher = ["open", str(output_dir)]
-    elif shutil.which("xdg-open"):
-        launcher = ["xdg-open", str(output_dir)]
+        return "open"
+    if shutil.which("xdg-open"):
+        return "xdg-open"
+    return None
 
-    if launcher is None:
-        raise TTSBatchError("No supported folder opener was found on this system.")
+
+def open_output_dir(output_dir: Path) -> None:
+    opener = detect_output_dir_opener()
+    if opener is None:
+        raise DependencyError("No supported folder opener was found on this system.")
 
     completed = subprocess.run(
-        launcher,
+        [opener, str(output_dir)],
         capture_output=True,
         text=True,
         check=False,
     )
     if completed.returncode != 0:
         error_output = (completed.stderr or completed.stdout or "").strip()
-        raise TTSBatchError(error_output or "Failed to open the output directory.")
+        raise DependencyError(error_output or "Failed to open the output directory.")
 
 
 def run_batch_job(
@@ -337,6 +352,8 @@ def run_batch_job(
     success_count = 0
     failure_count = 0
     generated_audio_files: list[Path] = []
+    batch_exit_code = ExitCode.OK
+    merge_exit_code = ExitCode.OK
 
     for index, text in enumerate(segments, start=1):
         filename = f"{index:0{index_width}d}.{settings.audio_format}"
@@ -347,6 +364,8 @@ def run_batch_job(
             audio_bytes = synthesize_segment(text, settings, api_key)
         except TTSBatchError as exc:
             failure_count += 1
+            if batch_exit_code == ExitCode.OK:
+                batch_exit_code = exit_code_for_error(exc)
             results.append(
                 {
                     "index": index,
@@ -386,6 +405,7 @@ def run_batch_job(
         except TTSBatchError as exc:
             merge_status = "failed"
             merge_error = str(exc)
+            merge_exit_code = exit_code_for_error(exc)
             print(f"Merge failed: {exc}", file=sys.stderr)
         else:
             merge_status = "success"
@@ -433,16 +453,16 @@ def run_batch_job(
         f"Finished. Success: {success_count}, Failed: {failure_count}, Manifest: {output_dir / 'manifest.json'}"
     )
 
-    exit_code = 0
+    exit_code = ExitCode.OK
     if failure_count > 0:
-        exit_code = 1
+        exit_code = batch_exit_code or ExitCode.RUNTIME
     elif merge and merge_status != "success":
-        exit_code = 1
+        exit_code = merge_exit_code or ExitCode.RUNTIME
     elif merge and cleanup_status not in ("success", "skipped"):
-        exit_code = 1
+        exit_code = ExitCode.RUNTIME
 
     return BatchResult(
-        exit_code=exit_code,
+        exit_code=int(exit_code),
         output_dir=output_dir,
         manifest=manifest,
     )

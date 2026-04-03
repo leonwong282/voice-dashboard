@@ -14,10 +14,7 @@ from voice_dashboard.defaults import (
     DEFAULT_SPEED,
     DEFAULT_VOICE_ID,
 )
-
-
-class ConfigError(RuntimeError):
-    """Raised when the local configuration file is invalid."""
+from voice_dashboard.errors import ConfigError
 
 
 @dataclass(frozen=True)
@@ -67,10 +64,30 @@ def example_config() -> dict[str, Any]:
     return {"defaults": data}
 
 
-def load_config(config_path: str | None) -> AppConfig:
-    resolved_path = (
-        Path(config_path).expanduser() if config_path else DEFAULT_CONFIG_PATH
+def resolve_config_path(config_path: str | None) -> Path:
+    return Path(config_path).expanduser() if config_path else DEFAULT_CONFIG_PATH
+
+
+def write_example_config(
+    config_path: str | None = None,
+    overwrite: bool = False,
+) -> Path:
+    resolved_path = resolve_config_path(config_path)
+    if resolved_path.exists() and not overwrite:
+        raise ConfigError(
+            f"Config file already exists: {resolved_path}. Use --force to overwrite it."
+        )
+
+    resolved_path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_path.write_text(
+        json.dumps(example_config(), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
     )
+    return resolved_path
+
+
+def load_config(config_path: str | None) -> AppConfig:
+    resolved_path = resolve_config_path(config_path)
     if not resolved_path.exists():
         return AppConfig(config_path=resolved_path)
 

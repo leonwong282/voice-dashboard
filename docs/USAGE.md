@@ -9,7 +9,7 @@ This document explains how to use `ttsrun` in this repository for daily batch TT
 - Three input sources (choose one):
   - Text file path (positional argument)
   - `--stdin` (standard input)
-  - `--clipboard` (macOS `pbpaste`)
+  - `--clipboard` (supported clipboard commands such as `pbpaste`, `wl-paste`, `xclip`, or `xsel`)
 - Plain-text splitting by empty lines (one MP3 per segment)
 - Optional merge via `--merge` (default is **no merge**)
 - Output artifacts: `manifest.json` and `errors.jsonl`
@@ -20,7 +20,7 @@ This document explains how to use `ttsrun` in this repository for daily batch TT
 - Python 3.10+
 - Environment variable: `MINIMAX_API_KEY`
 - `ffmpeg` installed if you use `--merge`
-- macOS `pbpaste` available if you use `--clipboard`
+- A supported clipboard command installed if you use `--clipboard`
 
 Set API key (macOS/Linux):
 
@@ -139,6 +139,18 @@ Print a config example:
 ttsrun --print-config-example
 ```
 
+Print the resolved config path:
+
+```bash
+ttsrun --print-config-path
+```
+
+Create an example config file:
+
+```bash
+ttsrun --init-config
+```
+
 You can save and customize output as `~/.voice-dashboard.json`, for example:
 
 ```json
@@ -184,15 +196,38 @@ ttsrun examples/sample.txt --config /path/to/config.json
 - Workflow switches:
   - `--merge`
   - `--open`
+- Management commands:
+  - `--version`
+  - `--doctor`
+  - `--print-config-path`
+  - `--print-config-example`
+  - `--init-config`
+  - `--force` (with `--init-config`)
 
 ## 8. Failure Handling and Exit Codes
 
-- If any segment fails, process exits with non-zero status, while successful segments are kept.
+- Stable exit codes:
+  - `0`: success
+  - `2`: command-line usage error from `argparse`
+  - `3`: config error
+  - `4`: input source error
+  - `5`: authentication error
+  - `6`: API or network error
+  - `7`: dependency error
+- If any segment fails, process exits with a category-specific non-zero status, while successful segments are kept.
 - In `--merge` mode:
   - Missing `ffmpeg`, merge failure, or cleanup failure leads to non-zero exit.
   - On merge failure, segment files are preserved for troubleshooting.
 
-## 9. Recommended Daily Commands
+## 9. Environment Checks
+
+Run a quick environment report:
+
+```bash
+ttsrun --doctor
+```
+
+## 10. Recommended Daily Commands
 
 If your workflow is "copy text → generate audio":
 

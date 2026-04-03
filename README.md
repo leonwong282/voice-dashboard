@@ -23,7 +23,7 @@
 - Three input sources (choose one):
   - File path: `ttsrun <file.txt>`
   - Standard input: `ttsrun --stdin`
-  - Clipboard on macOS: `ttsrun --clipboard`
+  - Clipboard on supported systems: `ttsrun --clipboard`
 - Optional merge: only merges when `--merge` is provided.
 - Output artifacts for traceability:
   - `manifest.json`
@@ -68,7 +68,12 @@ pbpaste | ttsrun --stdin --merge
 - `--merge`: merge all successful segments and remove segment files.
 - `--open`: open output directory after completion.
 - `--config <path>`: use a specific config file.
+- `--version`: print the installed CLI version.
+- `--doctor`: inspect config, API key, and optional dependencies.
+- `--print-config-path`: print the resolved config path.
 - `--print-config-example`: print a sample config JSON.
+- `--init-config`: write an example config file.
+- `--force`: overwrite an existing config file when used with `--init-config`.
 
 ## 📖 Documentation
 

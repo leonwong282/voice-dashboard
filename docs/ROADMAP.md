@@ -91,6 +91,8 @@ Suggested release label:
 
 ### Milestone P1: CLI Productization
 
+Status: in progress as of 2026-04-03.
+
 Target outcome: a CLI that feels intentional and maintainable, not just functional.
 
 Key work:
@@ -115,6 +117,14 @@ Key work:
   - use better config and output path conventions
   - make open-folder behavior explicit and portable
 - Refactor the internal structure so the CLI layer, provider client, file output, and OS integration are easier to test independently.
+
+Progress notes:
+
+- `--version` is implemented.
+- Config workflows now include `--print-config-path` and `--init-config`.
+- `--doctor` is implemented for environment inspection.
+- Exit codes are now category-specific for config, input, auth, API, and dependency failures.
+- Clipboard support no longer assumes macOS only.
 
 Acceptance criteria:
 

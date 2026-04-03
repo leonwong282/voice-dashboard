@@ -1,21 +1,37 @@
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
-from voice_dashboard.config import AppConfig, ConfigError, example_config, load_config
+from voice_dashboard import __version__
+from voice_dashboard.config import (
+    AppConfig,
+    example_config,
+    load_config,
+    resolve_config_path,
+    write_example_config,
+)
 from voice_dashboard.defaults import DEFAULT_FORMAT
+from voice_dashboard.errors import (
+    ConfigError,
+    ExitCode,
+    InputSourceError,
+    TTSBatchError,
+    exit_code_for_error,
+)
 from voice_dashboard.input_sources import (
     InputSource,
-    InputSourceError,
+    detect_clipboard_reader,
     read_clipboard_source,
     read_file_source,
     read_stdin_source,
 )
 from voice_dashboard.pipeline import (
-    TTSBatchError,
     TTSSettings,
     build_output_dir,
+    detect_output_dir_opener,
+    find_ffmpeg_path,
     get_api_key,
     open_output_dir,
     run_batch_job,
@@ -44,13 +60,41 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--clipboard",
         action="store_true",
-        help="Read text from the macOS clipboard using pbpaste.",
+        help="Read text from the system clipboard when a supported clipboard tool is available.",
     )
     parser.add_argument("--config", help="Path to a JSON config file.")
-    parser.add_argument(
+
+    command_group = parser.add_mutually_exclusive_group()
+    command_group.add_argument(
+        "--version",
+        action="store_true",
+        help="Print the installed voice-dashboard version and exit.",
+    )
+    command_group.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Check environment, config, and optional dependencies.",
+    )
+    command_group.add_argument(
         "--print-config-example",
         action="store_true",
         help="Print an example config JSON and exit.",
+    )
+    command_group.add_argument(
+        "--print-config-path",
+        action="store_true",
+        help="Print the resolved config file path and exit.",
+    )
+    command_group.add_argument(
+        "--init-config",
+        action="store_true",
+        help="Write an example config file to the resolved config path and exit.",
+    )
+
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing files when supported, for example with --init-config.",
     )
     parser.add_argument(
         "--output-dir",
@@ -125,7 +169,9 @@ def resolve_input_source(
         ]
     )
     if selected != 1:
-        parser.error("Provide exactly one input source: file path, --stdin, or --clipboard.")
+        parser.error(
+            "Provide exactly one input source: file path, --stdin, or --clipboard."
+        )
 
     if args.input_path:
         return read_file_source(args.input_path)
@@ -134,13 +180,117 @@ def resolve_input_source(
     return read_clipboard_source()
 
 
+def print_doctor_check(status: str, label: str, detail: str) -> None:
+    print(f"[{status}] {label}: {detail}")
+
+
+def run_doctor(config_path: str | None) -> int:
+    exit_code = ExitCode.OK
+    resolved_config_path = resolve_config_path(config_path)
+
+    print(f"voice-dashboard {__version__}")
+    print(f"python: {sys.version.split()[0]}")
+    print_doctor_check("ok", "config path", str(resolved_config_path))
+
+    if resolved_config_path.exists():
+        try:
+            load_config(str(resolved_config_path))
+        except ConfigError as exc:
+            print_doctor_check("fail", "config file", str(exc))
+            if exit_code == ExitCode.OK:
+                exit_code = ExitCode.CONFIG
+        else:
+            print_doctor_check("ok", "config file", "loaded successfully")
+    else:
+        print_doctor_check(
+            "warn",
+            "config file",
+            "not found; defaults will be used until you run --init-config",
+        )
+
+    api_key = os.getenv("MINIMAX_API_KEY", "").strip()
+    if api_key:
+        print_doctor_check("ok", "MINIMAX_API_KEY", f"set ({len(api_key)} chars)")
+    else:
+        print_doctor_check(
+            "fail",
+            "MINIMAX_API_KEY",
+            "not set; export it before running ttsrun",
+        )
+        if exit_code == ExitCode.OK:
+            exit_code = ExitCode.AUTH
+
+    ffmpeg_path = find_ffmpeg_path()
+    if ffmpeg_path:
+        print_doctor_check("ok", "ffmpeg", ffmpeg_path)
+    else:
+        print_doctor_check(
+            "warn",
+            "ffmpeg",
+            "not found; install it before using --merge",
+        )
+
+    clipboard_reader = detect_clipboard_reader()
+    if clipboard_reader is None:
+        print_doctor_check(
+            "warn",
+            "clipboard",
+            "no supported clipboard command found (pbpaste, wl-paste, xclip, xsel)",
+        )
+    else:
+        reader_name, _, description = clipboard_reader
+        print_doctor_check("ok", "clipboard", f"{description} via {reader_name}")
+
+    opener = detect_output_dir_opener()
+    if opener is None:
+        print_doctor_check(
+            "warn",
+            "folder opener",
+            "no supported opener found (open or xdg-open)",
+        )
+    else:
+        print_doctor_check("ok", "folder opener", opener)
+
+    return int(exit_code)
+
+
+def handle_management_command(
+    parser: argparse.ArgumentParser,
+    args: argparse.Namespace,
+) -> int | None:
+    if args.force and not args.init_config:
+        parser.error("--force can only be used with --init-config.")
+
+    if args.version:
+        print(__version__)
+        return ExitCode.OK
+
+    if args.print_config_example:
+        print(json.dumps(example_config(), ensure_ascii=False, indent=2))
+        return ExitCode.OK
+
+    if args.print_config_path:
+        print(resolve_config_path(args.config))
+        return ExitCode.OK
+
+    if args.init_config:
+        path = write_example_config(args.config, overwrite=args.force)
+        print(f"Wrote example config to {path}")
+        return ExitCode.OK
+
+    if args.doctor:
+        return run_doctor(args.config)
+
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    if args.print_config_example:
-        print(json.dumps(example_config(), ensure_ascii=False, indent=2))
-        return 0
+    command_result = handle_management_command(parser, args)
+    if command_result is not None:
+        return int(command_result)
 
     try:
         config = load_config(args.config)
@@ -172,7 +322,7 @@ def main(argv: list[str] | None = None) -> int:
         return result.exit_code
     except (ConfigError, InputSourceError, TTSBatchError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
-        return 1
+        return int(exit_code_for_error(exc))
 
 
 def main_entry() -> None:

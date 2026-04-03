@@ -12,6 +12,7 @@ import requests
 
 import voice
 from voice_dashboard import cli, pipeline
+from voice_dashboard.errors import ExitCode
 
 
 class MockResponse:
@@ -45,17 +46,78 @@ class ParseSegmentsTests(unittest.TestCase):
 
 
 class CLITests(unittest.TestCase):
+    def test_version_prints_installed_version(self):
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            exit_code = cli.main(["--version"])
+
+        self.assertEqual(exit_code, ExitCode.OK)
+        self.assertEqual(buffer.getvalue().strip(), "0.1.0")
+
     def test_print_config_example(self):
         buffer = io.StringIO()
         with redirect_stdout(buffer):
             exit_code = cli.main(["--print-config-example"])
 
-        self.assertEqual(exit_code, 0)
+        self.assertEqual(exit_code, ExitCode.OK)
         payload = json.loads(buffer.getvalue())
         self.assertIn("defaults", payload)
         self.assertIn("voice_id", payload["defaults"])
         self.assertIn("output_root", payload["defaults"])
         self.assertIn("format", payload["defaults"])
+
+    def test_print_config_path_uses_resolved_path(self):
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            exit_code = cli.main(["--print-config-path"])
+
+        self.assertEqual(exit_code, ExitCode.OK)
+        self.assertTrue(buffer.getvalue().strip().endswith(".voice-dashboard.json"))
+
+    def test_init_config_writes_example_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            buffer = io.StringIO()
+
+            with redirect_stdout(buffer):
+                exit_code = cli.main(["--init-config", "--config", str(config_path)])
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertTrue(config_path.exists())
+            payload = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertIn("defaults", payload)
+            self.assertIn("Wrote example config", buffer.getvalue())
+
+    def test_doctor_reports_missing_api_key(self):
+        buffer = io.StringIO()
+        with patch.dict(os.environ, {}, clear=True):
+            with redirect_stdout(buffer):
+                exit_code = cli.main(["--doctor"])
+
+        self.assertEqual(exit_code, ExitCode.AUTH)
+        self.assertIn("MINIMAX_API_KEY", buffer.getvalue())
+
+    def test_invalid_config_returns_config_exit_code(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            config_path = Path(temp_dir) / "config.json"
+            input_path.write_text("第一段", encoding="utf-8")
+            config_path.write_text("{invalid", encoding="utf-8")
+
+            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+                exit_code = cli.main([str(input_path), "--config", str(config_path)])
+
+        self.assertEqual(exit_code, ExitCode.CONFIG)
+
+    def test_missing_api_key_returns_auth_exit_code(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            input_path.write_text("第一段", encoding="utf-8")
+
+            with patch.dict(os.environ, {}, clear=True):
+                exit_code = cli.main([str(input_path)])
+
+        self.assertEqual(exit_code, ExitCode.AUTH)
 
     def test_main_requires_exactly_one_input_source(self):
         with self.assertRaises(SystemExit) as context:
@@ -80,7 +142,7 @@ class CLITests(unittest.TestCase):
             with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
                 with patch("voice_dashboard.pipeline.requests.post", return_value=response):
                     exit_code = voice.main([str(input_path), "--output-dir", str(output_dir)])
-            self.assertEqual(exit_code, 0)
+            self.assertEqual(exit_code, ExitCode.OK)
             self.assertTrue((output_dir / "0001.mp3").exists())
 
     def test_config_values_are_used_when_cli_flags_are_absent(self):
@@ -116,7 +178,7 @@ class CLITests(unittest.TestCase):
                     "voice_dashboard.pipeline.requests.post", return_value=response
                 ) as mock_post:
                     exit_code = cli.main([str(input_path), "--config", str(config_path)])
-            self.assertEqual(exit_code, 0)
+            self.assertEqual(exit_code, ExitCode.OK)
             payload = mock_post.call_args.kwargs["json"]
             self.assertEqual(payload["model"], "cfg-model")
             self.assertEqual(payload["language_boost"], "Chinese,Mandarin")
@@ -141,7 +203,7 @@ class InputSourceTests(unittest.TestCase):
                         "voice_dashboard.pipeline.requests.post", return_value=response
                     ):
                         exit_code = cli.main(["--stdin", "--output-dir", str(output_dir)])
-            self.assertEqual(exit_code, 0)
+            self.assertEqual(exit_code, ExitCode.OK)
             self.assertTrue((output_dir / "0001.mp3").exists())
             self.assertTrue((output_dir / "0002.mp3").exists())
 
@@ -155,18 +217,58 @@ class InputSourceTests(unittest.TestCase):
 
             with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
                 with patch(
-                    "voice_dashboard.input_sources.subprocess.run",
-                    return_value=CompletedProcess(
-                        ["pbpaste"], 0, stdout="第一段\n\n第二段", stderr=""
-                    ),
+                    "voice_dashboard.input_sources.shutil.which",
+                    return_value="/usr/bin/pbpaste",
                 ):
                     with patch(
-                        "voice_dashboard.pipeline.requests.post", return_value=response
+                        "voice_dashboard.input_sources.subprocess.run",
+                        return_value=CompletedProcess(
+                            ["pbpaste"], 0, stdout="第一段\n\n第二段", stderr=""
+                        ),
                     ):
-                        exit_code = cli.main(
-                            ["--clipboard", "--output-dir", str(output_dir)]
-                        )
-            self.assertEqual(exit_code, 0)
+                        with patch(
+                            "voice_dashboard.pipeline.requests.post",
+                            return_value=response,
+                        ):
+                            exit_code = cli.main(
+                                ["--clipboard", "--output-dir", str(output_dir)]
+                            )
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertTrue((output_dir / "0001.mp3").exists())
+            self.assertTrue((output_dir / "0002.mp3").exists())
+
+    def test_clipboard_input_supports_linux_fallback_command(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir) / "out"
+            response = MockResponse(
+                200,
+                {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
+            )
+
+            def which_side_effect(name):
+                if name == "xclip":
+                    return "/usr/bin/xclip"
+                return None
+
+            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+                with patch(
+                    "voice_dashboard.input_sources.shutil.which",
+                    side_effect=which_side_effect,
+                ):
+                    with patch(
+                        "voice_dashboard.input_sources.subprocess.run",
+                        return_value=CompletedProcess(
+                            ["xclip"], 0, stdout="第一段\n\n第二段", stderr=""
+                        ),
+                    ):
+                        with patch(
+                            "voice_dashboard.pipeline.requests.post",
+                            return_value=response,
+                        ):
+                            exit_code = cli.main(
+                                ["--clipboard", "--output-dir", str(output_dir)]
+                            )
+            self.assertEqual(exit_code, ExitCode.OK)
             self.assertTrue((output_dir / "0001.mp3").exists())
             self.assertTrue((output_dir / "0002.mp3").exists())
 
@@ -200,7 +302,7 @@ class BatchFlowTests(unittest.TestCase):
                 manifest = json.loads(
                     (output_dir / "manifest.json").read_text(encoding="utf-8")
                 )
-                self.assertEqual(exit_code, 0)
+                self.assertEqual(exit_code, ExitCode.OK)
                 self.assertTrue((output_dir / "0001.mp3").exists())
                 self.assertTrue((output_dir / "0002.mp3").exists())
                 self.assertFalse((output_dir / "merged.mp3").exists())
@@ -240,7 +342,7 @@ class BatchFlowTests(unittest.TestCase):
                 errors_lines = (
                     output_dir / "errors.jsonl"
                 ).read_text(encoding="utf-8").splitlines()
-                self.assertEqual(exit_code, 1)
+                self.assertEqual(exit_code, ExitCode.API)
                 self.assertTrue((output_dir / "0001.mp3").exists())
                 self.assertFalse((output_dir / "0002.mp3").exists())
                 self.assertTrue((output_dir / "0003.mp3").exists())
@@ -271,7 +373,7 @@ class BatchFlowTests(unittest.TestCase):
                 manifest = json.loads(
                     (output_dir / "manifest.json").read_text(encoding="utf-8")
                 )
-                self.assertEqual(exit_code, 1)
+                self.assertEqual(exit_code, ExitCode.DEPENDENCY)
                 self.assertTrue((output_dir / "0001.mp3").exists())
                 self.assertTrue((output_dir / "0002.mp3").exists())
                 self.assertFalse((output_dir / "merged.mp3").exists())
@@ -308,7 +410,7 @@ class BatchFlowTests(unittest.TestCase):
                 manifest = json.loads(
                     (output_dir / "manifest.json").read_text(encoding="utf-8")
                 )
-                self.assertEqual(exit_code, 0)
+                self.assertEqual(exit_code, ExitCode.OK)
                 self.assertEqual(len(manifest["segments"]), len(expected_segments))
                 self.assertEqual(manifest["summary"]["merge_status"], "success")
                 self.assertEqual(manifest["summary"]["cleanup_status"], "success")
@@ -348,7 +450,7 @@ class BatchFlowTests(unittest.TestCase):
                 manifest = json.loads(
                     (output_dir / "manifest.json").read_text(encoding="utf-8")
                 )
-                self.assertEqual(exit_code, 0)
+                self.assertEqual(exit_code, ExitCode.OK)
                 self.assertEqual(manifest["summary"]["merge_status"], "skipped")
                 self.assertEqual(manifest["summary"]["cleanup_status"], "skipped")
                 self.assertFalse((output_dir / "merged.mp3").exists())
@@ -380,7 +482,7 @@ class BatchFlowTests(unittest.TestCase):
                 ) as mock_post:
                     with patch("voice_dashboard.pipeline.time.sleep"):
                         exit_code = cli.main([str(input_path), "--output-dir", str(output_dir)])
-            self.assertEqual(exit_code, 0)
+            self.assertEqual(exit_code, ExitCode.OK)
             self.assertEqual(mock_post.call_count, 2)
 
 

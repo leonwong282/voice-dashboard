@@ -23,7 +23,7 @@
 - 三種輸入來源（三選一）：
   - 檔案：`ttsrun <file.txt>`
   - 標準輸入：`ttsrun --stdin`
-  - 剪貼簿（macOS）：`ttsrun --clipboard`
+  - 剪貼簿（支援的系統上）：`ttsrun --clipboard`
 - 可選合併：只有加上 `--merge` 才會合併為單一檔案。
 - 產出追蹤檔案：
   - `manifest.json`
@@ -68,7 +68,12 @@ pbpaste | ttsrun --stdin --merge
 - `--merge`：全部成功後合併，並刪除分段檔。
 - `--open`：完成後嘗試打開輸出目錄。
 - `--config <path>`：使用指定設定檔。
+- `--version`：輸出目前 CLI 版本。
+- `--doctor`：檢查設定檔、API key 與可選依賴。
+- `--print-config-path`：輸出實際設定檔路徑。
 - `--print-config-example`：輸出設定檔範例。
+- `--init-config`：寫入一份設定檔範例。
+- `--force`：搭配 `--init-config` 覆寫既有設定檔。
 
 ## 📖 文件
 

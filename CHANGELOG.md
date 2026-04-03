@@ -11,12 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Development guide at `docs/DEVELOPMENT.md` with bootstrap, lint, test, and build commands.
 - GitHub Actions CI workflow for linting, tests, and package build validation.
 - Product roadmap at `docs/ROADMAP.md`, covering the path from repository-local utility to distributable CLI product.
+- `--version`, `--doctor`, `--print-config-path`, and `--init-config` management commands.
+- Category-specific exit codes for config, input, authentication, API, and dependency failures.
 
 ### Changed
 - Upgraded Python packaging metadata in `pyproject.toml` and moved to a single version source.
 - Documentation language policy clarified: README is bilingual (English + Traditional Chinese), while usage documentation is maintained in English.
 - Added repository ignore rules for generated build artifacts and local outputs.
 - Split source install and contributor install guidance so user-facing docs no longer default to editable mode.
+- Expanded clipboard support beyond macOS by detecting supported clipboard commands at runtime.
 
 ## [0.1.0] - 2026-04-03
 
