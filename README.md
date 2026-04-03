@@ -2,137 +2,73 @@
 
 <div align="center">
 
-<a href="https://github.com/leonwong282/awesome-project-template">
-  <img src="images/logo.png" alt="Logo" width="80" height="80">
-</a>
+# 🎙️ voice-dashboard
 
-# 🚀 Awesome Project Template
+> A practical MiniMax batch Text-to-Speech CLI for daily workflows.
 
-> A modern, beautiful, and well-structured open source project template
-
-![Version](https://img.shields.io/badge/Version-1.0.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.1.0-blue?style=for-the-badge)
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL--3.0-red?style=for-the-badge)
-![Template](https://img.shields.io/badge/Template-Ready-green?style=for-the-badge)
-![Stars](https://img.shields.io/github/stars/leonwong282/awesome-project-template?style=for-the-badge&color=yellow)
+![CLI](https://img.shields.io/badge/CLI-ttsrun-green?style=for-the-badge)
 
 [🌍 English](README.md) | [🇹🇼 繁體中文](README.zh-TW.md)
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Structure](#-template-structure) • [Contributing](#-contributing)
+[Features](#-features) • [Quick Start](#-quick-start) • [Common Options](#-common-options) • [Documentation](#-documentation)
 
 </div>
 
 ## ✨ Features
 
-- 📝 **Documentation-First**: Comprehensive README, contributing guides, and documentation structure
-- 🤝 **GitHub Integration**: Issue templates, PR templates, and community health files
-- 🌍 **Multi-Language**: README in English and Traditional Chinese
-- 📋 **Community Standards**: Code of Conduct, Security Policy, and Contributing guidelines
-- ⚙️ **Editor Consistency**: EditorConfig for consistent code style across editors
-- 🏷️ **Conventional Commits**: Structured commit message guidelines
+- Plain-text paragraph splitting by empty lines, generating one MP3 per segment.
+- Three input sources (choose one):
+  - File path: `ttsrun <file.txt>`
+  - Standard input: `ttsrun --stdin`
+  - Clipboard on macOS: `ttsrun --clipboard`
+- Optional merge: only merges when `--merge` is provided.
+- Output artifacts for traceability:
+  - `manifest.json`
+  - `errors.jsonl`
 
 ## 🚀 Quick Start
 
-### Using as Template
+### 1) Set API key
 
-**Method 1: GitHub Web Interface (Recommended)**
-1. Click the "Use this template" button above
-2. Configure your new repository
-3. Start coding!
-
-**Method 2: GitHub CLI**
 ```bash
-gh repo create your-project-name \
-  --template leonwong282/awesome-project-template \
-  --public --clone
+export MINIMAX_API_KEY="your_new_key"
 ```
 
-**Method 3: Manual Clone**
+### 2) Install (editable mode)
+
 ```bash
-git clone https://github.com/leonwong282/awesome-project-template.git your-project
-cd your-project
-rm -rf .git && git init
+python3 -m pip install -e .
 ```
 
-### After Creating Your Project
+### 3) Run
 
-1. **Update project information**
-   - Replace "Project Name" placeholders in documentation
-   - Update repository URLs to your own
-   - Configure author information
+```bash
+# File input
+ttsrun examples/sample.txt
 
-2. **Add your tech stack**
-   - Create `package.json`, `requirements.txt`, or your dependency file
-   - Add source code directories (`src/`, `lib/`, etc.)
-   - Set up your build tools and CI/CD
+# Stdin input
+pbpaste | ttsrun --stdin
 
-3. **Customize documentation**
-   - Update `docs/GETTING_STARTED.md` with your setup instructions
-   - Modify issue templates for your project's needs
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-## 🏗️ Template Structure
-
-```
-awesome-project-template/
-├── 📚 docs/                     # Documentation hub
-│   ├── GETTING_STARTED.md       # Setup guide template
-│   └── README.md                # Documentation index
-├── 🤝 .github/                  # GitHub integration
-│   ├── ISSUE_TEMPLATE/          # Issue templates (bug, feature, docs, question)
-│   ├── copilot-instructions.md  # AI coding assistant guidance
-│   └── pull_request_template.md # PR template
-├── 🖼️ images/                   # Visual assets
-│   └── logo.png                 # Project logo
-├── 📋 Community Files
-│   ├── README.md                # This file
-│   ├── README.zh-TW.md          # Traditional Chinese README
-│   ├── CONTRIBUTING.md          # Contribution guidelines
-│   ├── CODE_OF_CONDUCT.md       # Community standards
-│   ├── SECURITY.md              # Security policy
-│   ├── CHANGELOG.md             # Version history template
-│   └── LICENSE                  # GPL-3.0 license
-└── ⚙️ Configuration
-    ├── .editorconfig            # Editor settings
-    ├── .gitignore               # Git ignore patterns
-    └── .gitattributes           # Git attributes
+# Merge only when you need a combined output
+pbpaste | ttsrun --stdin --merge
 ```
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+## ⚙️ Common Options
+
+- `--output-dir <dir>`: write outputs to a fixed directory.
+- `--output-root <dir>`: set the default output root.
+- `--name <label>`: customize job folder suffix.
+- `--merge`: merge all successful segments and remove segment files.
+- `--open`: open output directory after completion.
+- `--config <path>`: use a specific config file.
+- `--print-config-example`: print a sample config JSON.
 
 ## 📖 Documentation
 
-- **[📚 Documentation Hub](docs/README.md)** - Complete documentation index
-- **[🚀 Getting Started](docs/GETTING_STARTED.md)** - Setup instructions template
-- **[🤝 Contributing](CONTRIBUTING.md)** - How to contribute
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Quick Contribution Steps
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'feat: add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-## 📋 Roadmap
-
-- [x] Core template structure
-- [x] GitHub issue/PR templates
-- [x] Multi-language README
-- [x] Community health files
-- [ ] CI/CD workflow templates
-- [ ] Docker configuration templates
-- [ ] Additional language READMEs
-
-See the [open issues](https://github.com/leonwong282/awesome-project-template/issues) for more.
+- Full usage guide: [docs/USAGE.md](docs/USAGE.md)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -147,15 +83,13 @@ This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) 
 ## 🙏 Acknowledgments
 
 - [Best-README-Template](https://github.com/othneildrew/Best-README-Template)
-- [Contributor Covenant](https://www.contributor-covenant.org/)
-- [Keep a Changelog](https://keepachangelog.com/)
 - [Shields.io](https://shields.io/)
+- [MiniMax](https://www.minimaxi.com/)
 
 ## 📞 Support
 
-- 📝 [Open an issue](https://github.com/leonwong282/awesome-project-template/issues/new)
-- 💬 [Start a discussion](https://github.com/leonwong282/awesome-project-template/discussions)
-- 📧 Email: leonwong282@gmail.com
+- 📝 [Open an issue](https://github.com/leonwong282/voice-dashboard/issues/new)
+- 💬 [Start a discussion](https://github.com/leonwong282/voice-dashboard/discussions)
 
 ---
 
