@@ -69,6 +69,7 @@ pbpaste | ttsrun --stdin --merge
 ## 📖 文件
 
 - 完整使用說明（英文）：[docs/USAGE.md](docs/USAGE.md)
+- 開發指南（英文）：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
 - 產品化路線圖：[docs/ROADMAP.md](docs/ROADMAP.md)
 
 <p align="right">(<a href="#readme-top">回到頂部</a>)</p>

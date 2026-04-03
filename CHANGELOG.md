@@ -7,11 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- Documentation language policy clarified: README is bilingual (English + Traditional Chinese), while usage documentation is maintained in English.
-
 ### Added
+- Development guide at `docs/DEVELOPMENT.md` with bootstrap, lint, test, and build commands.
+- GitHub Actions CI workflow for linting, tests, and package build validation.
 - Product roadmap at `docs/ROADMAP.md`, covering the path from repository-local utility to distributable CLI product.
+
+### Changed
+- Upgraded Python packaging metadata in `pyproject.toml` and moved to a single version source.
+- Documentation language policy clarified: README is bilingual (English + Traditional Chinese), while usage documentation is maintained in English.
+- Added repository ignore rules for generated build artifacts and local outputs.
 
 ## [0.1.0] - 2026-04-03
 
