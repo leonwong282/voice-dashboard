@@ -91,7 +91,7 @@ Suggested release label:
 
 ### Milestone P1: CLI Productization
 
-Status: in progress as of 2026-04-03.
+Status: completed on 2026-04-03.
 
 Target outcome: a CLI that feels intentional and maintainable, not just functional.
 
@@ -128,6 +128,8 @@ Progress notes:
 - Progress output now supports `--quiet` and `--verbose`.
 - `--json-summary` provides machine-readable batch summaries on stdout.
 - CI now includes a lightweight installed-CLI smoke layer for `ttsrun --help`, `ttsrun doctor`, and config commands.
+- Config resolution now prefers an XDG-style path for new users while preserving legacy `~/.voice-dashboard.json` installs.
+- Legacy management flags now print deprecation guidance toward the command-oriented interface.
 
 Acceptance criteria:
 
@@ -135,6 +137,12 @@ Acceptance criteria:
 - Common failure modes produce clear messages and stable non-zero exit codes.
 - macOS and Linux behavior is documented and tested where practical.
 - The CLI surface is coherent enough to remain stable through `1.0`.
+
+Completion notes:
+
+- The CLI now has a command-oriented management surface with `doctor`, `config`, and explicit `run` entrypoints.
+- Legacy management flags remain available as a deprecated compatibility layer with migration guidance.
+- Exit codes, progress streams, machine-readable summaries, and smoke checks are now stable enough to carry into distribution work.
 
 Suggested release label:
 
@@ -236,11 +244,11 @@ The following items may be valuable, but they should not block productization:
 
 The highest-value next moves are:
 
-1. Finish documenting the command-oriented CLI contract as the stable public interface for `0.3.0`.
-2. Normalize user-facing installation docs around source install, contributor install, and future PyPI install.
-3. Prepare PyPI publishing before attempting Homebrew support.
-4. Keep P1 focused on CLI consistency instead of expanding scope into new product features.
-5. Decide whether `0.3.0` should formalize legacy flags as deprecated or keep them indefinitely.
+1. Prepare PyPI publishing so users can install the package without cloning the repository.
+2. Normalize user-facing installation docs around `pip install`, `pipx install`, contributor install, and future Homebrew support.
+3. Add tag-driven release automation for source distributions and wheels.
+4. Define the initial Homebrew tap and formula strategy after the PyPI release path is stable.
+5. Add post-install smoke checks that validate the published package rather than only editable installs.
 
 ## 10. Success Metrics
 

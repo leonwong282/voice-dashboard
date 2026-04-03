@@ -55,16 +55,19 @@ class CLITests(unittest.TestCase):
         self.assertEqual(buffer.getvalue().strip(), "0.1.0")
 
     def test_print_config_example(self):
-        buffer = io.StringIO()
-        with redirect_stdout(buffer):
+        stdout_buffer = io.StringIO()
+        stderr_buffer = io.StringIO()
+        with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
             exit_code = cli.main(["--print-config-example"])
 
         self.assertEqual(exit_code, ExitCode.OK)
-        payload = json.loads(buffer.getvalue())
+        payload = json.loads(stdout_buffer.getvalue())
         self.assertIn("defaults", payload)
         self.assertIn("voice_id", payload["defaults"])
         self.assertIn("output_root", payload["defaults"])
         self.assertIn("format", payload["defaults"])
+        self.assertIn("deprecated", stderr_buffer.getvalue())
+        self.assertIn("ttsrun config example", stderr_buffer.getvalue())
 
     def test_config_example_subcommand(self):
         buffer = io.StringIO()
@@ -77,12 +80,15 @@ class CLITests(unittest.TestCase):
         self.assertIn("voice_id", payload["defaults"])
 
     def test_print_config_path_uses_resolved_path(self):
-        buffer = io.StringIO()
-        with redirect_stdout(buffer):
+        stdout_buffer = io.StringIO()
+        stderr_buffer = io.StringIO()
+        with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
             exit_code = cli.main(["--print-config-path"])
 
         self.assertEqual(exit_code, ExitCode.OK)
-        self.assertTrue(buffer.getvalue().strip().endswith(".voice-dashboard.json"))
+        self.assertTrue(stdout_buffer.getvalue().strip().endswith(".voice-dashboard.json"))
+        self.assertIn("deprecated", stderr_buffer.getvalue())
+        self.assertIn("ttsrun config path", stderr_buffer.getvalue())
 
     def test_config_path_subcommand_uses_resolved_path(self):
         buffer = io.StringIO()
@@ -92,19 +98,61 @@ class CLITests(unittest.TestCase):
         self.assertEqual(exit_code, ExitCode.OK)
         self.assertTrue(buffer.getvalue().strip().endswith(".voice-dashboard.json"))
 
+    def test_config_path_subcommand_uses_new_default_location_for_new_users(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_dir = Path(temp_dir) / "home"
+            home_dir.mkdir()
+            buffer = io.StringIO()
+
+            with patch.dict(
+                os.environ,
+                {"HOME": str(home_dir)},
+                clear=True,
+            ):
+                with redirect_stdout(buffer):
+                    exit_code = cli.main(["config", "path"])
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual(
+                buffer.getvalue().strip(),
+                str(home_dir / ".config" / "voice-dashboard" / "config.json"),
+            )
+
+    def test_config_path_subcommand_prefers_legacy_file_when_present(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_dir = Path(temp_dir) / "home"
+            home_dir.mkdir()
+            legacy_path = home_dir / ".voice-dashboard.json"
+            legacy_path.write_text("{}", encoding="utf-8")
+            buffer = io.StringIO()
+
+            with patch.dict(
+                os.environ,
+                {"HOME": str(home_dir)},
+                clear=True,
+            ):
+                with redirect_stdout(buffer):
+                    exit_code = cli.main(["config", "path"])
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual(buffer.getvalue().strip(), str(legacy_path))
+
     def test_init_config_writes_example_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "config.json"
-            buffer = io.StringIO()
+            stdout_buffer = io.StringIO()
+            stderr_buffer = io.StringIO()
 
-            with redirect_stdout(buffer):
+            with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
                 exit_code = cli.main(["--init-config", "--config", str(config_path)])
 
             self.assertEqual(exit_code, ExitCode.OK)
             self.assertTrue(config_path.exists())
             payload = json.loads(config_path.read_text(encoding="utf-8"))
             self.assertIn("defaults", payload)
-            self.assertIn("Wrote example config", buffer.getvalue())
+            self.assertIn("Wrote example config", stdout_buffer.getvalue())
+            self.assertIn("deprecated", stderr_buffer.getvalue())
+            self.assertIn("ttsrun config init", stderr_buffer.getvalue())
 
     def test_config_init_subcommand_writes_example_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -122,14 +170,36 @@ class CLITests(unittest.TestCase):
             self.assertIn("defaults", payload)
             self.assertIn("Wrote example config", buffer.getvalue())
 
+    def test_config_init_subcommand_writes_new_default_path_for_new_users(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_dir = Path(temp_dir) / "home"
+            home_dir.mkdir()
+            buffer = io.StringIO()
+            expected_path = home_dir / ".config" / "voice-dashboard" / "config.json"
+
+            with patch.dict(
+                os.environ,
+                {"HOME": str(home_dir)},
+                clear=True,
+            ):
+                with redirect_stdout(buffer):
+                    exit_code = cli.main(["config", "init"])
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertTrue(expected_path.exists())
+            self.assertIn(str(expected_path), buffer.getvalue())
+
     def test_doctor_reports_missing_api_key(self):
-        buffer = io.StringIO()
+        stdout_buffer = io.StringIO()
+        stderr_buffer = io.StringIO()
         with patch.dict(os.environ, {}, clear=True):
-            with redirect_stdout(buffer):
+            with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
                 exit_code = cli.main(["--doctor"])
 
         self.assertEqual(exit_code, ExitCode.AUTH)
-        self.assertIn("MINIMAX_API_KEY", buffer.getvalue())
+        self.assertIn("MINIMAX_API_KEY", stdout_buffer.getvalue())
+        self.assertIn("deprecated", stderr_buffer.getvalue())
+        self.assertIn("ttsrun doctor", stderr_buffer.getvalue())
 
     def test_doctor_subcommand_reports_missing_api_key(self):
         buffer = io.StringIO()
@@ -275,6 +345,32 @@ class CLITests(unittest.TestCase):
             self.assertEqual(payload["defaults"]["voice_id"], "cfg-voice")
             self.assertEqual(payload["config_path"], str(config_path))
             self.assertTrue(payload["config_exists"])
+
+    def test_config_show_reports_legacy_resolution_metadata(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_dir = Path(temp_dir) / "home"
+            home_dir.mkdir()
+            legacy_path = home_dir / ".voice-dashboard.json"
+            legacy_path.write_text("{}", encoding="utf-8")
+            buffer = io.StringIO()
+
+            with patch.dict(
+                os.environ,
+                {"HOME": str(home_dir)},
+                clear=True,
+            ):
+                with redirect_stdout(buffer):
+                    exit_code = cli.main(["config", "show"])
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            payload = json.loads(buffer.getvalue())
+            self.assertEqual(payload["config_path"], str(legacy_path))
+            self.assertEqual(
+                payload["preferred_config_path"],
+                str(home_dir / ".config" / "voice-dashboard" / "config.json"),
+            )
+            self.assertEqual(payload["legacy_config_path"], str(legacy_path))
+            self.assertTrue(payload["using_legacy_config_path"])
 
 
 class InputSourceTests(unittest.TestCase):

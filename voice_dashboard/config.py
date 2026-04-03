@@ -1,18 +1,19 @@
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
 from voice_dashboard.defaults import (
-    DEFAULT_CONFIG_PATH,
     DEFAULT_FORMAT,
     DEFAULT_LANGUAGE_BOOST,
     DEFAULT_MODEL,
-    DEFAULT_OUTPUT_ROOT,
     DEFAULT_PITCH,
     DEFAULT_SAMPLE_RATE,
     DEFAULT_SPEED,
     DEFAULT_VOICE_ID,
+    default_config_path,
+    default_output_root,
+    legacy_config_path,
 )
 from voice_dashboard.errors import ConfigError
 
@@ -26,9 +27,9 @@ class AppConfig:
     model: str = DEFAULT_MODEL
     sample_rate: int = DEFAULT_SAMPLE_RATE
     audio_format: str = DEFAULT_FORMAT
-    output_root: Path = DEFAULT_OUTPUT_ROOT
+    output_root: Path = field(default_factory=default_output_root)
     open_after_finish: bool = False
-    config_path: Path = DEFAULT_CONFIG_PATH
+    config_path: Path = field(default_factory=default_config_path)
 
 
 def _coerce_str(value: Any, field_name: str) -> str:
@@ -70,13 +71,27 @@ def serialize_config(
 
     payload: dict[str, Any] = {"defaults": data}
     if include_metadata:
+        preferred_config_path = default_config_path()
+        legacy_path = legacy_config_path()
         payload["config_path"] = str(config.config_path)
         payload["config_exists"] = config.config_path.exists()
+        payload["preferred_config_path"] = str(preferred_config_path)
+        payload["legacy_config_path"] = str(legacy_path)
+        payload["using_legacy_config_path"] = (
+            config.config_path == legacy_path and config.config_path != preferred_config_path
+        )
     return payload
 
 
 def resolve_config_path(config_path: str | None) -> Path:
-    return Path(config_path).expanduser() if config_path else DEFAULT_CONFIG_PATH
+    if config_path:
+        return Path(config_path).expanduser()
+
+    preferred_path = default_config_path()
+    legacy_path = legacy_config_path()
+    if legacy_path.exists() and not preferred_path.exists():
+        return legacy_path
+    return preferred_path
 
 
 def write_example_config(

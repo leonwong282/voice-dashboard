@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Category-specific exit codes for config, input, authentication, API, and dependency failures.
 - `--quiet`, `--verbose`, and `--json-summary` output controls for scripting and automation.
 - CLI smoke checks in `make smoke` and GitHub Actions to validate the installed `ttsrun` command.
+- XDG-style default config discovery for new users, while preserving existing legacy config files.
+- Deprecation warnings for legacy management flags, with command-oriented replacements.
 
 ### Changed
 - Upgraded Python packaging metadata in `pyproject.toml` and moved to a single version source.
@@ -25,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded clipboard support beyond macOS by detecting supported clipboard commands at runtime.
 - Progress output now goes to stderr so stdout can stay clean for explicit command output.
 - Documentation now treats subcommands as the primary management interface while keeping legacy flags as a compatibility layer.
+- Default output paths now follow a more product-like convention under `~/Documents/voice-dashboard` when available.
 
 ## [0.1.0] - 2026-04-03
 

@@ -52,6 +52,14 @@ Explicit run command:
 """
 
 
+LEGACY_FLAG_REPLACEMENTS = {
+    "--doctor": "ttsrun doctor",
+    "--print-config-path": "ttsrun config path",
+    "--print-config-example": "ttsrun config example",
+    "--init-config": "ttsrun config init",
+}
+
+
 def parse_pitch(value: str) -> int:
     try:
         return int(value)
@@ -276,6 +284,15 @@ def print_doctor_check(status: str, label: str, detail: str) -> None:
     print(f"[{status}] {label}: {detail}")
 
 
+def print_legacy_flag_warning(flag: str) -> None:
+    replacement = LEGACY_FLAG_REPLACEMENTS[flag]
+    print(
+        f"Warning: {flag} is deprecated and will be removed in a future release. "
+        f"Use `{replacement}` instead.",
+        file=sys.stderr,
+    )
+
+
 def build_reporter(args: argparse.Namespace) -> ProgressReporter:
     return ProgressReporter(
         quiet=args.quiet,
@@ -366,19 +383,23 @@ def handle_legacy_management_command(
         return ExitCode.OK
 
     if args.print_config_example:
+        print_legacy_flag_warning("--print-config-example")
         print(json.dumps(example_config(), ensure_ascii=False, indent=2))
         return ExitCode.OK
 
     if args.print_config_path:
+        print_legacy_flag_warning("--print-config-path")
         print(resolve_config_path(args.config))
         return ExitCode.OK
 
     if args.init_config:
+        print_legacy_flag_warning("--init-config")
         path = write_example_config(args.config, overwrite=args.force)
         print(f"Wrote example config to {path}")
         return ExitCode.OK
 
     if args.doctor:
+        print_legacy_flag_warning("--doctor")
         return run_doctor(args.config)
 
     return None

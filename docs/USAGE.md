@@ -127,7 +127,7 @@ If `--output-dir` is not provided, the tool creates:
 ```
 
 Where:
-- `output_root` comes from config (default: `~/Documents/tts-output`)
+- `output_root` comes from config (default: `~/Documents/voice-dashboard` when `~/Documents` exists, otherwise an XDG-style data directory)
 - `label` is derived from the input source (or overridden by `--name`)
 
 ### 5.2 Fixed output directory
@@ -149,8 +149,10 @@ Each run generates at least:
 Default config path:
 
 ```text
-~/.voice-dashboard.json
+~/.config/voice-dashboard/config.json
 ```
+
+If you already have the legacy file `~/.voice-dashboard.json`, `ttsrun` keeps using it until you move or replace it.
 
 Print a config example:
 
@@ -176,7 +178,7 @@ Show the effective configuration, including resolved metadata:
 ttsrun config show
 ```
 
-You can save and customize output as `~/.voice-dashboard.json`, for example:
+You can save and customize output in the resolved config path, for example:
 
 ```json
 {
@@ -188,7 +190,7 @@ You can save and customize output as `~/.voice-dashboard.json`, for example:
     "model": "speech-2.8-hd",
     "sample_rate": 32000,
     "format": "mp3",
-    "output_root": "~/Documents/tts-output",
+    "output_root": "~/Documents/voice-dashboard",
     "open_after_finish": false
   }
 }
@@ -231,7 +233,7 @@ ttsrun examples/sample.txt --config /path/to/config.json
   - `config show`
   - `config example`
   - `config init`
-- Legacy compatibility flags:
+- Deprecated compatibility flags:
   - `--doctor`
   - `--print-config-path`
   - `--print-config-example`

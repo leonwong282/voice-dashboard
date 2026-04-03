@@ -90,7 +90,7 @@ ttsrun config show
 ttsrun config init
 ```
 
-`ttsrun run <input_path>` is also supported as an explicit batch subcommand. The older management flags remain available for compatibility.
+`ttsrun run <input_path>` is also supported as an explicit batch subcommand. The older management flags remain available as a deprecated compatibility layer.
 
 ## 📖 Documentation
 

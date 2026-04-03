@@ -90,7 +90,7 @@ ttsrun config show
 ttsrun config init
 ```
 
-也支援用 `ttsrun run <input_path>` 明確執行批次流程。舊的管理 flags 仍保留作為相容層。
+也支援用 `ttsrun run <input_path>` 明確執行批次流程。舊的管理 flags 仍保留，但已標示為 deprecated 的相容層。
 
 ## 📖 文件
 
