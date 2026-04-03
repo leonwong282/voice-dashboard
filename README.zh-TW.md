@@ -71,3 +71,32 @@ pbpaste | ttsrun --stdin --merge
 - 完整使用說明（英文）：[docs/USAGE.md](docs/USAGE.md)
 
 <p align="right">(<a href="#readme-top">回到頂部</a>)</p>
+
+## 📄 授權條款
+
+本專案採用 GPL-3.0 授權條款 - 詳情請見 [LICENSE](LICENSE)。
+
+## 👥 作者
+
+**Leon Wong** - [leonwong282](https://github.com/leonwong282)
+
+## 🙏 致謝
+
+- [Best-README-Template](https://github.com/othneildrew/Best-README-Template)
+- [Shields.io](https://shields.io/)
+- [MiniMax](https://www.minimaxi.com/)
+
+## 📞 支援
+
+- 📝 [開啟 issue](https://github.com/leonwong282/voice-dashboard/issues/new)
+- 💬 [開始討論](https://github.com/leonwong282/voice-dashboard/discussions)
+
+---
+
+<div align="center">
+
+**⭐ 如果這個儲存庫對你有幫助，歡迎給一顆星！**
+
+由 [Leon](https://github.com/leonwong282) 用 ❤️ 製作
+
+</div>

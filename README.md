@@ -71,3 +71,32 @@ pbpaste | ttsrun --stdin --merge
 - Full usage guide: [docs/USAGE.md](docs/USAGE.md)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## 📄 License
+
+This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+
+## 👥 Author
+
+**Leon Wong** - [leonwong282](https://github.com/leonwong282)
+
+## 🙏 Acknowledgments
+
+- [Best-README-Template](https://github.com/othneildrew/Best-README-Template)
+- [Shields.io](https://shields.io/)
+- [MiniMax](https://www.minimaxi.com/)
+
+## 📞 Support
+
+- 📝 [Open an issue](https://github.com/leonwong282/voice-dashboard/issues/new)
+- 💬 [Start a discussion](https://github.com/leonwong282/voice-dashboard/discussions)
+
+---
+
+<div align="center">
+
+**⭐ Star this repository if it helped you!**
+
+Made with ❤️ by [Leon](https://github.com/leonwong282)
+
+</div>
