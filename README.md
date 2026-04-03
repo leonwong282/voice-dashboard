@@ -49,6 +49,18 @@ For regular local use from source:
 python3 -m pip install .
 ```
 
+Once the package is published to PyPI, prefer `pipx` for CLI-style installation:
+
+```bash
+pipx install voice-dashboard
+```
+
+If you explicitly want the package in an existing Python environment:
+
+```bash
+python3 -m pip install voice-dashboard
+```
+
 For contributor setup, use the development guide and editable install instead.
 
 ### 3) Run
@@ -96,6 +108,7 @@ ttsrun config init
 
 - Full usage guide: [docs/USAGE.md](docs/USAGE.md)
 - Development guide: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- Release guide: [docs/RELEASING.md](docs/RELEASING.md)
 - Product roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

@@ -49,6 +49,18 @@ export MINIMAX_API_KEY="你的新 key"
 python3 -m pip install .
 ```
 
+等套件正式發布到 PyPI 後，CLI 型工具建議優先用 `pipx` 安裝：
+
+```bash
+pipx install voice-dashboard
+```
+
+如果你明確想裝進某個既有 Python 環境：
+
+```bash
+python3 -m pip install voice-dashboard
+```
+
 如果是要參與開發，請改看開發指南並使用 editable install。
 
 ### 3) 執行
@@ -96,6 +108,7 @@ ttsrun config init
 
 - 完整使用說明（英文）：[docs/USAGE.md](docs/USAGE.md)
 - 開發指南（英文）：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- 發布指南（英文）：[docs/RELEASING.md](docs/RELEASING.md)
 - 產品化路線圖：[docs/ROADMAP.md](docs/ROADMAP.md)
 
 <p align="right">(<a href="#readme-top">回到頂部</a>)</p>

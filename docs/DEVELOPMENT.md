@@ -35,6 +35,7 @@ make lint
 make test
 make smoke
 make build
+make release-smoke
 ```
 
 If you prefer not to use `make`, the equivalent commands are:
@@ -85,3 +86,5 @@ The CI workflow validates three things on every change:
 - package build validation with `python -m build`
 
 Any local change should pass the same checks before release work begins.
+
+For maintainer release steps, see `docs/RELEASING.md`.

@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: dev lint test smoke build check clean
+.PHONY: dev lint test smoke build release-smoke check clean
 
 dev:
 	$(PYTHON) -m pip install --upgrade pip
@@ -21,8 +21,21 @@ smoke:
 	ttsrun config example
 
 build:
+	rm -rf build dist
 	$(PYTHON) -m build
 	$(PYTHON) -m twine check dist/*
+
+release-smoke: build
+	tmpdir=$$(mktemp -d); \
+	"$(PYTHON)" -m venv "$$tmpdir/venv"; \
+	"$$tmpdir/venv/bin/python" -m pip install --upgrade pip >/dev/null; \
+	"$$tmpdir/venv/bin/python" -m pip install dist/*.whl >/dev/null; \
+	"$$tmpdir/venv/bin/ttsrun" --help >/dev/null; \
+	"$$tmpdir/venv/bin/ttsrun" --version; \
+	MINIMAX_API_KEY=smoke-test-key "$$tmpdir/venv/bin/ttsrun" doctor >/dev/null; \
+	"$$tmpdir/venv/bin/ttsrun" config path >/dev/null; \
+	"$$tmpdir/venv/bin/ttsrun" config example >/dev/null; \
+	rm -rf "$$tmpdir"
 
 check: lint test smoke build
 

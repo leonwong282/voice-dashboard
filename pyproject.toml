@@ -41,6 +41,8 @@ Homepage = "https://github.com/leonwong282/voice-dashboard"
 Source = "https://github.com/leonwong282/voice-dashboard"
 Issues = "https://github.com/leonwong282/voice-dashboard/issues"
 Changelog = "https://github.com/leonwong282/voice-dashboard/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/leonwong282/voice-dashboard/tree/main/docs"
+Releases = "https://github.com/leonwong282/voice-dashboard/releases"
 
 [project.scripts]
 ttsrun = "voice_dashboard.cli:main_entry"

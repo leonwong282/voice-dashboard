@@ -38,7 +38,21 @@ export MINIMAX_API_KEY="your_new_key"
 
 The project exposes a `console_scripts` command named `ttsrun`.
 
-### 3.1 Local install from source
+### 3.1 Published install from PyPI
+
+Once a public PyPI release exists, prefer `pipx` for end-user CLI installation:
+
+```bash
+pipx install voice-dashboard
+```
+
+If you want the package inside an existing Python environment instead:
+
+```bash
+python3 -m pip install voice-dashboard
+```
+
+### 3.2 Local install from source
 
 Run at repository root:
 
@@ -53,7 +67,7 @@ ttsrun --help
 ttsrun doctor
 ```
 
-### 3.2 Editable install for contributors
+### 3.3 Editable install for contributors
 
 If you are working on the project itself:
 
@@ -63,7 +77,7 @@ python3 -m pip install -e ".[dev]"
 
 See `docs/DEVELOPMENT.md` for the full contributor workflow.
 
-### 3.3 Direct script entrypoint
+### 3.4 Direct script entrypoint
 
 If you do not want an installed command yet:
 

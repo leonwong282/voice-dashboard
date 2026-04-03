@@ -150,6 +150,8 @@ Suggested release label:
 
 ### Milestone P2: Distribution And Install Channels
 
+Status: in progress as of 2026-04-03.
+
 Target outcome: end users can install the tool without cloning the repository.
 
 Key work:
@@ -173,6 +175,12 @@ Acceptance criteria:
 - A user can install the current release from PyPI and run `ttsrun --help`.
 - A user can install from Homebrew and run the same CLI successfully.
 - Tagging a release produces the expected artifacts without ad hoc manual steps.
+
+Progress notes:
+
+- A tag-driven `release.yml` workflow now builds distributions, runs install-from-wheel smoke checks, creates GitHub release assets, and publishes to PyPI via Trusted Publishing.
+- Installation docs now describe the intended `pipx install voice-dashboard` and `pip install voice-dashboard` paths for public releases.
+- Maintainer release steps are now documented in `docs/RELEASING.md`.
 
 Suggested release label:
 
@@ -244,11 +252,11 @@ The following items may be valuable, but they should not block productization:
 
 The highest-value next moves are:
 
-1. Prepare PyPI publishing so users can install the package without cloning the repository.
-2. Normalize user-facing installation docs around `pip install`, `pipx install`, contributor install, and future Homebrew support.
-3. Add tag-driven release automation for source distributions and wheels.
-4. Define the initial Homebrew tap and formula strategy after the PyPI release path is stable.
-5. Add post-install smoke checks that validate the published package rather than only editable installs.
+1. Register the PyPI trusted publisher and cut the first tagged release to validate the real publish path.
+2. Verify `pipx install voice-dashboard` against the published package instead of only local wheels.
+3. Define the initial Homebrew tap and formula strategy after the PyPI release path is stable.
+4. Add post-publish smoke checks or a reusable checklist for public installation verification.
+5. Keep Homebrew work separate from PyPI release stabilization.
 
 ## 10. Success Metrics
 
