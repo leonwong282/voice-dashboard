@@ -1,13 +1,13 @@
 PYTHON ?= python3
 
-.PHONY: dev lint test smoke build release-smoke check clean
+.PHONY: dev lint test smoke build dist-sha256 homebrew-formula release-smoke check clean
 
 dev:
 	$(PYTHON) -m pip install --upgrade pip
 	$(PYTHON) -m pip install -e ".[dev]"
 
 lint:
-	$(PYTHON) -m pyflakes voice.py voice_dashboard tests
+	$(PYTHON) -m pyflakes voice.py voice_dashboard tests scripts
 
 test:
 	$(PYTHON) -m pytest -q
@@ -24,6 +24,12 @@ build:
 	rm -rf build dist
 	$(PYTHON) -m build
 	$(PYTHON) -m twine check dist/*
+
+dist-sha256: build
+	shasum -a 256 dist/*.tar.gz
+
+homebrew-formula:
+	$(PYTHON) scripts/render_homebrew_formula.py --source-url "$(SOURCE_URL)" --source-sha256 "$(SOURCE_SHA256)"
 
 release-smoke: build
 	tmpdir=$$(mktemp -d); \

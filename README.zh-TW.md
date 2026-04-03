@@ -61,6 +61,8 @@ pipx install voice-dashboard
 python3 -m pip install voice-dashboard
 ```
 
+Homebrew 安裝通道已規劃，但尚未正式發布；預計做法記錄在 `docs/HOMEBREW.md`。
+
 如果是要參與開發，請改看開發指南並使用 editable install。
 
 ### 3) 執行
@@ -108,6 +110,7 @@ ttsrun config init
 
 - 完整使用說明（英文）：[docs/USAGE.md](docs/USAGE.md)
 - 開發指南（英文）：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- Homebrew 指南（英文）：[docs/HOMEBREW.md](docs/HOMEBREW.md)
 - 發布指南（英文）：[docs/RELEASING.md](docs/RELEASING.md)
 - 產品化路線圖：[docs/ROADMAP.md](docs/ROADMAP.md)
 

@@ -27,7 +27,7 @@ jobs:
         run: python -m pip install -e ".[dev]"
 
       - name: Run Pyflakes
-        run: python -m pyflakes voice.py voice_dashboard tests
+        run: python -m pyflakes voice.py voice_dashboard tests scripts
 
       - name: Run tests
         run: python -m pytest -q

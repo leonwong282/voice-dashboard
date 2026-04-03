@@ -70,6 +70,28 @@ python3 -m venv /tmp/voice-dashboard-release-check
 rm -rf /tmp/voice-dashboard-release-check
 ```
 
+For a repeatable scripted check, use:
+
+```bash
+python scripts/verify_public_install.py --package-spec voice-dashboard==0.4.0
+```
+
 ## 5. Homebrew Follow-Up
 
 Homebrew support should be added only after the PyPI release path is stable. Once the first public PyPI release is verified, use the GitHub Release artifacts from the matching tag as the input for a tap formula.
+
+The repository includes a starting point at `packaging/homebrew/voice-dashboard.rb.template` plus a dedicated guide in `docs/HOMEBREW.md`.
+
+To prepare the source tarball checksum for a formula update:
+
+```bash
+make dist-sha256
+```
+
+To render a concrete formula body from the published source tarball:
+
+```bash
+python scripts/render_homebrew_formula.py \
+  --source-url https://github.com/leonwong282/voice-dashboard/archive/refs/tags/v0.4.0.tar.gz \
+  --source-sha256 <sha256>
+```

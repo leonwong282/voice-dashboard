@@ -1,0 +1,26 @@
+class VoiceDashboard < Formula
+  include Language::Python::Virtualenv
+
+  desc "Daily-friendly MiniMax batch TTS CLI"
+  homepage "https://github.com/leonwong282/voice-dashboard"
+  url "__SOURCE_TARBALL_URL__"
+  sha256 "__SOURCE_TARBALL_SHA256__"
+  license "GPL-3.0-only"
+
+  depends_on "python@3.12"
+
+  # Add transitive resources with:
+  #   brew update-python-resources --print-only Formula/voice-dashboard.rb
+  # or render the full formula from this repository with:
+  #   python scripts/render_homebrew_formula.py --source-url ... --source-sha256 ...
+__RESOURCE_STANZAS__
+
+  def install
+    virtualenv_install_with_resources
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/ttsrun --version")
+    assert_match "voice-dashboard", shell_output("#{bin}/ttsrun --help")
+  end
+end

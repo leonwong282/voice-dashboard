@@ -181,6 +181,9 @@ Progress notes:
 - A tag-driven `release.yml` workflow now builds distributions, runs install-from-wheel smoke checks, creates GitHub release assets, and publishes to PyPI via Trusted Publishing.
 - Installation docs now describe the intended `pipx install voice-dashboard` and `pip install voice-dashboard` paths for public releases.
 - Maintainer release steps are now documented in `docs/RELEASING.md`.
+- A Homebrew packaging guide and formula template now exist so tap work can start from a repeatable baseline.
+- A reusable public-install smoke workflow and helper script now exist for verifying published `pip` and `pipx` installation paths.
+- A Homebrew formula renderer now converts the repository template plus resolved Python resources into a concrete formula body.
 
 Suggested release label:
 

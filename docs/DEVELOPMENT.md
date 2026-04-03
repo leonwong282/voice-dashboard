@@ -35,13 +35,15 @@ make lint
 make test
 make smoke
 make build
+make dist-sha256
+make homebrew-formula SOURCE_URL=... SOURCE_SHA256=...
 make release-smoke
 ```
 
 If you prefer not to use `make`, the equivalent commands are:
 
 ```bash
-python -m pyflakes voice.py voice_dashboard tests
+python -m pyflakes voice.py voice_dashboard tests scripts
 python -m pytest -q
 ttsrun --help
 MINIMAX_API_KEY=smoke-test-key ttsrun doctor

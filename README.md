@@ -61,6 +61,8 @@ If you explicitly want the package in an existing Python environment:
 python3 -m pip install voice-dashboard
 ```
 
+Homebrew support is planned but not published yet. The intended path is documented in `docs/HOMEBREW.md`.
+
 For contributor setup, use the development guide and editable install instead.
 
 ### 3) Run
@@ -108,6 +110,7 @@ ttsrun config init
 
 - Full usage guide: [docs/USAGE.md](docs/USAGE.md)
 - Development guide: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- Homebrew guide: [docs/HOMEBREW.md](docs/HOMEBREW.md)
 - Release guide: [docs/RELEASING.md](docs/RELEASING.md)
 - Product roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
 

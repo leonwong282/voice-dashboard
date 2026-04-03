@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tag-driven release workflow for GitHub Releases and PyPI publishing.
 - Maintainer release guide at `docs/RELEASING.md`.
 - `make release-smoke` to validate the built wheel in a clean virtual environment before publishing.
+- Homebrew packaging guide and formula template for future tap maintenance.
+- Scripted public-install verification for published packages and a manual GitHub Actions smoke workflow.
+- Homebrew formula renderer for turning release metadata into a concrete formula body.
 
 ### Changed
 - Upgraded Python packaging metadata in `pyproject.toml` and moved to a single version source.
