@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded Python packaging metadata in `pyproject.toml` and moved to a single version source.
 - Documentation language policy clarified: README is bilingual (English + Traditional Chinese), while usage documentation is maintained in English.
 - Added repository ignore rules for generated build artifacts and local outputs.
+- Split source install and contributor install guidance so user-facing docs no longer default to editable mode.
 
 ## [0.1.0] - 2026-04-03
 

@@ -37,11 +37,15 @@
 export MINIMAX_API_KEY="你的新 key"
 ```
 
-### 2) 安裝（開發模式）
+### 2) 安裝
+
+一般本地使用原始碼時：
 
 ```bash
-python3 -m pip install -e .
+python3 -m pip install .
 ```
+
+如果是要參與開發，請改看開發指南並使用 editable install。
 
 ### 3) 執行
 

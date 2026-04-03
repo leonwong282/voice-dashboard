@@ -34,12 +34,12 @@ export MINIMAX_API_KEY="your_new_key"
 
 The project exposes a `console_scripts` command named `ttsrun`.
 
-### 3.1 Editable install (recommended)
+### 3.1 Local install from source
 
 Run at repository root:
 
 ```bash
-python3 -m pip install -e .
+python3 -m pip install .
 ```
 
 Then verify:
@@ -48,9 +48,19 @@ Then verify:
 ttsrun --help
 ```
 
-### 3.2 Direct script entrypoint
+### 3.2 Editable install for contributors
 
-If you do not want a global command yet:
+If you are working on the project itself:
+
+```bash
+python3 -m pip install -e ".[dev]"
+```
+
+See `docs/DEVELOPMENT.md` for the full contributor workflow.
+
+### 3.3 Direct script entrypoint
+
+If you do not want an installed command yet:
 
 ```bash
 python3 voice.py --help

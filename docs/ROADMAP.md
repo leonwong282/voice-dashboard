@@ -47,6 +47,8 @@ The project is not yet at product level because it still depends on repository-l
 
 ### Milestone P0: Packaging And Repository Foundation
 
+Status: completed on 2026-04-03.
+
 Target outcome: a clean Python project that can be built, tested, and prepared for publication in a repeatable way.
 
 Key work:
@@ -74,6 +76,14 @@ Acceptance criteria:
 - `python -m build` works in CI.
 - The git tree stays clean after local build and test commands.
 - Release metadata is complete enough for PyPI display without manual editing.
+
+Completion notes:
+
+- Packaging metadata was expanded in `pyproject.toml`.
+- Versioning now uses a single source of truth from the package module.
+- Generated artifacts were removed from version control and ignored going forward.
+- Local contributor commands were documented and codified in `Makefile`.
+- CI now runs lint, tests, and package build validation.
 
 Suggested release label:
 
@@ -213,11 +223,11 @@ The following items may be valuable, but they should not block productization:
 
 The highest-value next moves are:
 
-1. Clean repository artifacts and add `.gitignore`.
-2. Upgrade `pyproject.toml` to real publishable metadata.
-3. Add a development dependency group and CI build/test workflow.
-4. Define the target CLI contract for `--version`, config commands, and doctor checks.
-5. Prepare PyPI publishing before attempting Homebrew support.
+1. Define the target CLI contract for `--version`, config commands, and doctor checks.
+2. Normalize user-facing installation docs around source install, contributor install, and future PyPI install.
+3. Prepare PyPI publishing before attempting Homebrew support.
+4. Design stable exit code semantics for config, API, and dependency failures.
+5. Start the P1 CLI productization pass without expanding scope into distribution yet.
 
 ## 10. Success Metrics
 

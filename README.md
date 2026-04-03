@@ -37,11 +37,15 @@
 export MINIMAX_API_KEY="your_new_key"
 ```
 
-### 2) Install (editable mode)
+### 2) Install
+
+For regular local use from source:
 
 ```bash
-python3 -m pip install -e .
+python3 -m pip install .
 ```
+
+For contributor setup, use the development guide and editable install instead.
 
 ### 3) Run
 
