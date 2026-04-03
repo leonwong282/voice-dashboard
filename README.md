@@ -25,6 +25,10 @@
   - Standard input: `ttsrun --stdin`
   - Clipboard on supported systems: `ttsrun --clipboard`
 - Optional merge: only merges when `--merge` is provided.
+- Output control for automation and scripting:
+  - `--quiet`
+  - `--verbose`
+  - `--json-summary`
 - Output artifacts for traceability:
   - `manifest.json`
   - `errors.jsonl`
@@ -74,6 +78,8 @@ pbpaste | ttsrun --stdin --merge
 - `--print-config-example`: print a sample config JSON.
 - `--init-config`: write an example config file.
 - `--force`: overwrite an existing config file when used with `--init-config`.
+- `--quiet` / `--verbose`: control progress output on stderr.
+- `--json-summary`: print the final manifest summary as JSON.
 
 ## 📖 Documentation
 

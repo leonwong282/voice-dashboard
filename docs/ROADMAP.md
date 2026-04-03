@@ -125,6 +125,8 @@ Progress notes:
 - `--doctor` is implemented for environment inspection.
 - Exit codes are now category-specific for config, input, auth, API, and dependency failures.
 - Clipboard support no longer assumes macOS only.
+- Progress output now supports `--quiet` and `--verbose`.
+- `--json-summary` provides machine-readable batch summaries on stdout.
 
 Acceptance criteria:
 

@@ -3,7 +3,7 @@ import json
 import os
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from subprocess import CompletedProcess
 from unittest.mock import patch
@@ -484,6 +484,84 @@ class BatchFlowTests(unittest.TestCase):
                         exit_code = cli.main([str(input_path), "--output-dir", str(output_dir)])
             self.assertEqual(exit_code, ExitCode.OK)
             self.assertEqual(mock_post.call_count, 2)
+
+    def test_json_summary_prints_summary_to_stdout(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            input_path.write_text("第一段\n\n第二段", encoding="utf-8")
+            response = MockResponse(
+                200,
+                {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
+            )
+            stdout_buffer = io.StringIO()
+            stderr_buffer = io.StringIO()
+
+            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+                with patch(
+                    "voice_dashboard.pipeline.requests.post", return_value=response
+                ):
+                    with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
+                        exit_code = cli.main(
+                            [
+                                str(input_path),
+                                "--output-dir",
+                                str(output_dir),
+                                "--json-summary",
+                            ]
+                        )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            payload = json.loads(stdout_buffer.getvalue())
+            self.assertEqual(payload["succeeded"], 2)
+            self.assertEqual(payload["failed"], 0)
+            self.assertIn("Loaded 2 segments", stderr_buffer.getvalue())
+
+    def test_quiet_suppresses_progress_output(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            input_path.write_text("第一段", encoding="utf-8")
+            response = MockResponse(
+                200,
+                {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
+            )
+            stderr_buffer = io.StringIO()
+
+            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+                with patch(
+                    "voice_dashboard.pipeline.requests.post", return_value=response
+                ):
+                    with redirect_stderr(stderr_buffer):
+                        exit_code = cli.main(
+                            [str(input_path), "--output-dir", str(output_dir), "--quiet"]
+                        )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual(stderr_buffer.getvalue(), "")
+
+    def test_verbose_prints_settings_detail(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            input_path.write_text("第一段", encoding="utf-8")
+            response = MockResponse(
+                200,
+                {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
+            )
+            stderr_buffer = io.StringIO()
+
+            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+                with patch(
+                    "voice_dashboard.pipeline.requests.post", return_value=response
+                ):
+                    with redirect_stderr(stderr_buffer):
+                        exit_code = cli.main(
+                            [str(input_path), "--output-dir", str(output_dir), "--verbose"]
+                        )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertIn("Settings:", stderr_buffer.getvalue())
 
 
 if __name__ == "__main__":

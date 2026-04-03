@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Product roadmap at `docs/ROADMAP.md`, covering the path from repository-local utility to distributable CLI product.
 - `--version`, `--doctor`, `--print-config-path`, and `--init-config` management commands.
 - Category-specific exit codes for config, input, authentication, API, and dependency failures.
+- `--quiet`, `--verbose`, and `--json-summary` output controls for scripting and automation.
 
 ### Changed
 - Upgraded Python packaging metadata in `pyproject.toml` and moved to a single version source.
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added repository ignore rules for generated build artifacts and local outputs.
 - Split source install and contributor install guidance so user-facing docs no longer default to editable mode.
 - Expanded clipboard support beyond macOS by detecting supported clipboard commands at runtime.
+- Progress output now goes to stderr so stdout can stay clean for explicit command output.
 
 ## [0.1.0] - 2026-04-03
 

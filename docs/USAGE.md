@@ -12,6 +12,10 @@ This document explains how to use `ttsrun` in this repository for daily batch TT
   - `--clipboard` (supported clipboard commands such as `pbpaste`, `wl-paste`, `xclip`, or `xsel`)
 - Plain-text splitting by empty lines (one MP3 per segment)
 - Optional merge via `--merge` (default is **no merge**)
+- Output control for scripting:
+  - `--quiet`
+  - `--verbose`
+  - `--json-summary`
 - Output artifacts: `manifest.json` and `errors.jsonl`
 - Config file support for persistent defaults
 
@@ -96,6 +100,14 @@ ttsrun examples/sample.txt --merge
 
 - Without `--merge`: keeps `0001.mp3`, `0002.mp3`, ...
 - With `--merge`: generates `merged.mp3` after all segments succeed, then removes segment files from this run
+
+### 4.5 Machine-readable summary
+
+```bash
+ttsrun examples/sample.txt --json-summary
+```
+
+This prints the final manifest summary JSON to stdout. Progress output stays on stderr so the JSON can be piped safely.
 
 ## 5. Output Rules
 
@@ -196,6 +208,9 @@ ttsrun examples/sample.txt --config /path/to/config.json
 - Workflow switches:
   - `--merge`
   - `--open`
+  - `--quiet`
+  - `--verbose`
+  - `--json-summary`
 - Management commands:
   - `--version`
   - `--doctor`
@@ -227,7 +242,18 @@ Run a quick environment report:
 ttsrun --doctor
 ```
 
-## 10. Recommended Daily Commands
+## 10. Output Streams
+
+- stdout is used for explicit command output such as:
+  - `--version`
+  - `--print-config-path`
+  - `--print-config-example`
+  - `--json-summary`
+- stderr is used for progress lines, warnings, and errors during batch execution.
+- `--quiet` suppresses progress output while still allowing warnings and errors.
+- `--verbose` adds extra detail such as resolved settings and retry notices.
+
+## 11. Recommended Daily Commands
 
 If your workflow is "copy text → generate audio":
 

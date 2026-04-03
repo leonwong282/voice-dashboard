@@ -9,7 +9,7 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 import requests
 
@@ -46,6 +46,27 @@ class BatchResult:
     exit_code: int
     output_dir: Path
     manifest: dict[str, Any]
+
+
+@dataclass
+class ProgressReporter:
+    quiet: bool = False
+    verbose: bool = False
+    stream: TextIO = sys.stderr
+
+    def info(self, message: str) -> None:
+        if not self.quiet:
+            print(message, file=self.stream)
+
+    def detail(self, message: str) -> None:
+        if self.verbose and not self.quiet:
+            print(message, file=self.stream)
+
+    def warn(self, message: str) -> None:
+        print(message, file=self.stream)
+
+    def error(self, message: str) -> None:
+        print(message, file=self.stream)
 
 
 def parse_segments(text: str) -> list[str]:
@@ -107,6 +128,7 @@ def synthesize_segment(
     api_key: str,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
     max_retries: int = DEFAULT_MAX_RETRIES,
+    reporter: ProgressReporter | None = None,
 ) -> bytes:
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -176,6 +198,10 @@ def synthesize_segment(
                 return decode_audio_hex(audio_hex)
 
         if retryable and attempt < max_retries:
+            if reporter is not None:
+                reporter.detail(
+                    f"Retrying after API failure ({attempt}/{max_retries}): {last_error}"
+                )
             time.sleep(attempt)
             continue
 
@@ -338,14 +364,20 @@ def run_batch_job(
     settings: TTSSettings,
     api_key: str,
     merge: bool,
+    reporter: ProgressReporter | None = None,
 ) -> BatchResult:
+    reporter = reporter or ProgressReporter()
     segments = parse_segments(source.text)
     if not segments:
         raise TTSBatchError("No non-empty segments found in the provided input.")
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Loaded {len(segments)} segments from {source.kind}")
-    print(f"Output directory: {output_dir.resolve()}")
+    reporter.info(f"Loaded {len(segments)} segments from {source.kind}")
+    reporter.info(f"Output directory: {output_dir.resolve()}")
+    reporter.detail(
+        "Settings: "
+        + json.dumps(asdict(settings), ensure_ascii=False, sort_keys=True)
+    )
 
     index_width = max(4, len(str(len(segments))))
     results: list[dict[str, Any]] = []
@@ -358,10 +390,15 @@ def run_batch_job(
     for index, text in enumerate(segments, start=1):
         filename = f"{index:0{index_width}d}.{settings.audio_format}"
         output_path = output_dir / filename
-        print(f"[{index}/{len(segments)}] Synthesizing {filename} ...")
+        reporter.info(f"[{index}/{len(segments)}] Synthesizing {filename} ...")
 
         try:
-            audio_bytes = synthesize_segment(text, settings, api_key)
+            audio_bytes = synthesize_segment(
+                text,
+                settings,
+                api_key,
+                reporter=reporter,
+            )
         except TTSBatchError as exc:
             failure_count += 1
             if batch_exit_code == ExitCode.OK:
@@ -375,7 +412,7 @@ def run_batch_job(
                     "error": str(exc),
                 }
             )
-            print(f"[{index}/{len(segments)}] Failed: {exc}", file=sys.stderr)
+            reporter.error(f"[{index}/{len(segments)}] Failed: {exc}")
             continue
 
         write_audio_file(output_path, audio_bytes)
@@ -390,7 +427,7 @@ def run_batch_job(
                 "error": None,
             }
         )
-        print(f"[{index}/{len(segments)}] Wrote {filename}")
+        reporter.info(f"[{index}/{len(segments)}] Wrote {filename}")
 
     merged_output_file: str | None = None
     merge_status = "skipped"
@@ -399,34 +436,34 @@ def run_batch_job(
     deleted_segment_files = 0
 
     if failure_count == 0 and merge:
-        print("All segments generated successfully. Starting merge to merged.mp3 ...")
+        reporter.info("All segments generated successfully. Starting merge to merged.mp3 ...")
         try:
             merged_output_path = merge_audio_files(output_dir, generated_audio_files)
         except TTSBatchError as exc:
             merge_status = "failed"
             merge_error = str(exc)
             merge_exit_code = exit_code_for_error(exc)
-            print(f"Merge failed: {exc}", file=sys.stderr)
+            reporter.error(f"Merge failed: {exc}")
         else:
             merge_status = "success"
             merged_output_file = merged_output_path.name
-            print(f"Merge succeeded: {merged_output_path}")
+            reporter.info(f"Merge succeeded: {merged_output_path}")
             deleted_segment_files, cleanup_errors = delete_segment_files(
                 generated_audio_files
             )
             if cleanup_errors:
                 cleanup_status = "failed"
                 merge_error = "; ".join(cleanup_errors)
-                print(f"Cleanup failed after merge: {merge_error}", file=sys.stderr)
+                reporter.error(f"Cleanup failed after merge: {merge_error}")
             else:
                 cleanup_status = "success"
-                print(
+                reporter.info(
                     f"Deleted {deleted_segment_files} segment files after successful merge."
                 )
     elif failure_count == 0:
-        print("Merge not requested. Keeping segment files.")
+        reporter.info("Merge not requested. Keeping segment files.")
     else:
-        print("Skipping merge because one or more segments failed.")
+        reporter.info("Skipping merge because one or more segments failed.")
 
     manifest = {
         "input_source": source.kind,
@@ -449,7 +486,7 @@ def run_batch_job(
     write_manifest(output_dir, manifest)
     write_errors_file(output_dir, results)
 
-    print(
+    reporter.info(
         f"Finished. Success: {success_count}, Failed: {failure_count}, Manifest: {output_dir / 'manifest.json'}"
     )
 

@@ -28,6 +28,7 @@ from voice_dashboard.input_sources import (
     read_stdin_source,
 )
 from voice_dashboard.pipeline import (
+    ProgressReporter,
     TTSSettings,
     build_output_dir,
     detect_output_dir_opener,
@@ -134,6 +135,22 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Open the output directory after the job finishes.",
     )
+    output_group = parser.add_mutually_exclusive_group()
+    output_group.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress progress output and only print warnings or errors.",
+    )
+    output_group.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print additional progress details to stderr.",
+    )
+    parser.add_argument(
+        "--json-summary",
+        action="store_true",
+        help="Print the final manifest summary as JSON to stdout after the run.",
+    )
     return parser
 
 
@@ -182,6 +199,14 @@ def resolve_input_source(
 
 def print_doctor_check(status: str, label: str, detail: str) -> None:
     print(f"[{status}] {label}: {detail}")
+
+
+def build_reporter(args: argparse.Namespace) -> ProgressReporter:
+    return ProgressReporter(
+        quiet=args.quiet,
+        verbose=args.verbose,
+        stream=sys.stderr,
+    )
 
 
 def run_doctor(config_path: str | None) -> int:
@@ -313,7 +338,10 @@ def main(argv: list[str] | None = None) -> int:
             settings=settings,
             api_key=get_api_key(),
             merge=args.merge,
+            reporter=build_reporter(args),
         )
+        if args.json_summary:
+            print(json.dumps(result.manifest["summary"], ensure_ascii=False))
         if resolve_open_after_finish(args, config):
             try:
                 open_output_dir(result.output_dir)

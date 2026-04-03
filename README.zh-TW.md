@@ -25,6 +25,10 @@
   - 標準輸入：`ttsrun --stdin`
   - 剪貼簿（支援的系統上）：`ttsrun --clipboard`
 - 可選合併：只有加上 `--merge` 才會合併為單一檔案。
+- 為自動化與腳本提供輸出控制：
+  - `--quiet`
+  - `--verbose`
+  - `--json-summary`
 - 產出追蹤檔案：
   - `manifest.json`
   - `errors.jsonl`
@@ -74,6 +78,8 @@ pbpaste | ttsrun --stdin --merge
 - `--print-config-example`：輸出設定檔範例。
 - `--init-config`：寫入一份設定檔範例。
 - `--force`：搭配 `--init-config` 覆寫既有設定檔。
+- `--quiet` / `--verbose`：控制 stderr 上的進度輸出。
+- `--json-summary`：以 JSON 輸出最終摘要。
 
 ## 📖 文件
 
