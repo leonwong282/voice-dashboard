@@ -185,6 +185,7 @@ Progress notes:
 - A reusable public-install smoke workflow and helper script now exist for verifying published `pip` and `pipx` installation paths.
 - A Homebrew formula renderer now converts the repository template plus resolved Python resources into a concrete formula body.
 - The main release workflow now includes post-publish install verification from PyPI and publishes a rendered Homebrew formula artifact alongside the release assets.
+- The release workflow now also publishes artifact checksums and renders the Homebrew formula from the published PyPI release metadata.
 
 Suggested release label:
 

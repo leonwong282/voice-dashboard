@@ -43,10 +43,11 @@ The release workflow then:
 2. Runs `make check release-smoke`.
 3. Builds `sdist` and `wheel` artifacts.
 4. Uploads `dist/*` as workflow artifacts.
-5. Publishes the same distributions to PyPI through Trusted Publishing.
-6. Verifies `voice-dashboard==<tag-version>` through real `pip` and `pipx` installs from PyPI.
-7. Renders a Homebrew formula asset for the same tag.
-8. Creates or updates the matching GitHub Release and attaches both the built distributions and the rendered formula.
+5. Generates `SHA256SUMS.txt` for the release artifacts.
+6. Publishes the same distributions to PyPI through Trusted Publishing.
+7. Verifies `voice-dashboard==<tag-version>` through real `pip` and `pipx` installs from PyPI.
+8. Renders a Homebrew formula asset for the same tag using the published PyPI sdist metadata.
+9. Creates or updates the matching GitHub Release and attaches the built distributions, checksums, and rendered formula.
 
 You can also run the workflow manually with `workflow_dispatch` to rehearse the build and artifact path without creating a published release.
 
@@ -95,9 +96,7 @@ make dist-sha256
 To render a concrete formula body from the published source tarball:
 
 ```bash
-python scripts/render_homebrew_formula.py \
-  --source-url https://github.com/leonwong282/voice-dashboard/archive/refs/tags/v0.4.0.tar.gz \
-  --source-sha256 <sha256>
+python scripts/render_homebrew_formula.py --package-version 0.4.0
 ```
 
 The release workflow now attaches the rendered `voice-dashboard.rb` file to the matching GitHub Release so the tap update can start from a concrete artifact instead of a manual copy step.

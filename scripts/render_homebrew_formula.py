@@ -96,6 +96,29 @@ def fetch_sdist_metadata(name: str, version: str) -> dict[str, str]:
     raise RuntimeError(f"No sdist found on PyPI for {name}=={version}")
 
 
+def resolve_source_distribution(
+    *,
+    project_name: str,
+    package_version: str | None,
+    source_url: str | None,
+    source_sha256: str | None,
+) -> dict[str, str]:
+    if source_url and source_sha256:
+        return {
+            "name": project_name,
+            "version": package_version or "unknown",
+            "url": source_url,
+            "sha256": source_sha256,
+        }
+
+    if package_version:
+        return fetch_sdist_metadata(project_name, package_version)
+
+    raise RuntimeError(
+        "Provide either --source-url with --source-sha256, or --package-version."
+    )
+
+
 def render_resource_stanza(resource: dict[str, str]) -> str:
     return "\n".join(
         [
@@ -128,13 +151,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--source-url",
-        required=True,
         help="Published source tarball URL for the release.",
     )
     parser.add_argument(
         "--source-sha256",
-        required=True,
         help="SHA256 digest for the published source tarball.",
+    )
+    parser.add_argument(
+        "--package-version",
+        help="Published package version. When set, the source sdist URL and SHA256 are fetched from PyPI.",
     )
     parser.add_argument(
         "--python-executable",
@@ -152,7 +177,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     project_metadata = load_project_metadata()
+    project_name = project_metadata["name"]
     requirements = project_metadata.get("dependencies", [])
+    source_distribution = resolve_source_distribution(
+        project_name=project_name,
+        package_version=args.package_version,
+        source_url=args.source_url,
+        source_sha256=args.source_sha256,
+    )
     resolved_dependencies = resolve_dependency_versions(
         args.python_executable,
         requirements,
@@ -161,8 +193,8 @@ def main(argv: list[str] | None = None) -> int:
         fetch_sdist_metadata(name, version) for name, version in resolved_dependencies
     ]
     rendered = render_formula(
-        source_url=args.source_url,
-        source_sha256=args.source_sha256,
+        source_url=source_distribution["url"],
+        source_sha256=source_distribution["sha256"],
         resources=resources,
     )
 

@@ -35,6 +35,16 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+      - name: Generate artifact checksums
+        run: sha256sum dist/* > dist/SHA256SUMS.txt
+
+      - name: Upload checksum artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: dist/SHA256SUMS.txt
+          if-no-files-found: error
+
   public-install-smoke:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: pypi-publish
@@ -74,14 +84,9 @@ jobs:
       - name: Render Homebrew formula for this tag
         run: |
           mkdir -p release-assets
-          source_url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz"
-          curl -fsSL "$source_url" -o release-assets/source.tar.gz
-          source_sha256="$(sha256sum release-assets/source.tar.gz | awk '{print $1}')"
           python scripts/render_homebrew_formula.py \
-            --source-url "$source_url" \
-            --source-sha256 "$source_sha256" \
+            --package-version "${GITHUB_REF_NAME#v}" \
             --output release-assets/voice-dashboard.rb
-          rm -f release-assets/source.tar.gz
 
       - name: Upload Homebrew formula artifact
         uses: actions/upload-artifact@v4
@@ -107,6 +112,12 @@ jobs:
         with:
           name: dist
           path: dist
+
+      - name: Download checksum artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: checksums
+          path: release-assets
 
       - name: Download Homebrew formula artifact
         uses: actions/download-artifact@v4

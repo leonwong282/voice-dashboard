@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scripted public-install verification for published packages and a manual GitHub Actions smoke workflow.
 - Homebrew formula renderer for turning release metadata into a concrete formula body.
 - Automated post-publish install verification and Homebrew formula artifacts in the main release workflow.
+- Release checksum assets and PyPI-driven Homebrew formula rendering in the tag workflow.
 
 ### Changed
 - Upgraded Python packaging metadata in `pyproject.toml` and moved to a single version source.

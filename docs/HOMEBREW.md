@@ -75,10 +75,16 @@ The repository includes:
 
 That template is intentionally not a live formula yet. It exists to keep release-time edits small and repeatable.
 
-You can render a concrete formula from a published release tarball with:
+You can render a concrete formula directly from the published PyPI release metadata with:
+
+```bash
+python scripts/render_homebrew_formula.py --package-version 0.4.0
+```
+
+If you need to override the source tarball URL manually, the script also accepts:
 
 ```bash
 python scripts/render_homebrew_formula.py \
-  --source-url https://github.com/leonwong282/voice-dashboard/archive/refs/tags/v0.4.0.tar.gz \
+  --source-url <source-tarball-url> \
   --source-sha256 <sha256>
 ```
