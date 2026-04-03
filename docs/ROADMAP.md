@@ -121,12 +121,13 @@ Key work:
 Progress notes:
 
 - `--version` is implemented.
-- Config workflows now include `--print-config-path` and `--init-config`.
-- `--doctor` is implemented for environment inspection.
+- Command-oriented management workflows now include `ttsrun doctor`, `ttsrun config path`, `ttsrun config show`, `ttsrun config example`, and `ttsrun config init`.
+- Legacy management flags such as `--doctor`, `--print-config-path`, and `--init-config` remain available as a compatibility layer.
 - Exit codes are now category-specific for config, input, auth, API, and dependency failures.
 - Clipboard support no longer assumes macOS only.
 - Progress output now supports `--quiet` and `--verbose`.
 - `--json-summary` provides machine-readable batch summaries on stdout.
+- CI now includes a lightweight installed-CLI smoke layer for `ttsrun --help`, `ttsrun doctor`, and config commands.
 
 Acceptance criteria:
 
@@ -235,11 +236,11 @@ The following items may be valuable, but they should not block productization:
 
 The highest-value next moves are:
 
-1. Define the target CLI contract for `--version`, config commands, and doctor checks.
+1. Finish documenting the command-oriented CLI contract as the stable public interface for `0.3.0`.
 2. Normalize user-facing installation docs around source install, contributor install, and future PyPI install.
 3. Prepare PyPI publishing before attempting Homebrew support.
-4. Design stable exit code semantics for config, API, and dependency failures.
-5. Start the P1 CLI productization pass without expanding scope into distribution yet.
+4. Keep P1 focused on CLI consistency instead of expanding scope into new product features.
+5. Decide whether `0.3.0` should formalize legacy flags as deprecated or keep them indefinitely.
 
 ## 10. Success Metrics
 

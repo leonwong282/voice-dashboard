@@ -32,6 +32,9 @@ jobs:
       - name: Run tests
         run: python -m pytest -q
 
+      - name: Run CLI smoke checks
+        run: make smoke
+
   build:
     runs-on: ubuntu-latest
 
@@ -46,6 +49,9 @@ jobs:
 
       - name: Install project and development dependencies
         run: python -m pip install -e ".[dev]"
+
+      - name: Run CLI smoke checks
+        run: make smoke
 
       - name: Build distribution artifacts
         run: python -m build

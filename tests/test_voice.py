@@ -66,10 +66,28 @@ class CLITests(unittest.TestCase):
         self.assertIn("output_root", payload["defaults"])
         self.assertIn("format", payload["defaults"])
 
+    def test_config_example_subcommand(self):
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            exit_code = cli.main(["config", "example"])
+
+        self.assertEqual(exit_code, ExitCode.OK)
+        payload = json.loads(buffer.getvalue())
+        self.assertIn("defaults", payload)
+        self.assertIn("voice_id", payload["defaults"])
+
     def test_print_config_path_uses_resolved_path(self):
         buffer = io.StringIO()
         with redirect_stdout(buffer):
             exit_code = cli.main(["--print-config-path"])
+
+        self.assertEqual(exit_code, ExitCode.OK)
+        self.assertTrue(buffer.getvalue().strip().endswith(".voice-dashboard.json"))
+
+    def test_config_path_subcommand_uses_resolved_path(self):
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            exit_code = cli.main(["config", "path"])
 
         self.assertEqual(exit_code, ExitCode.OK)
         self.assertTrue(buffer.getvalue().strip().endswith(".voice-dashboard.json"))
@@ -88,11 +106,36 @@ class CLITests(unittest.TestCase):
             self.assertIn("defaults", payload)
             self.assertIn("Wrote example config", buffer.getvalue())
 
+    def test_config_init_subcommand_writes_example_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            buffer = io.StringIO()
+
+            with redirect_stdout(buffer):
+                exit_code = cli.main(
+                    ["config", "init", "--config", str(config_path)]
+                )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertTrue(config_path.exists())
+            payload = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertIn("defaults", payload)
+            self.assertIn("Wrote example config", buffer.getvalue())
+
     def test_doctor_reports_missing_api_key(self):
         buffer = io.StringIO()
         with patch.dict(os.environ, {}, clear=True):
             with redirect_stdout(buffer):
                 exit_code = cli.main(["--doctor"])
+
+        self.assertEqual(exit_code, ExitCode.AUTH)
+        self.assertIn("MINIMAX_API_KEY", buffer.getvalue())
+
+    def test_doctor_subcommand_reports_missing_api_key(self):
+        buffer = io.StringIO()
+        with patch.dict(os.environ, {}, clear=True):
+            with redirect_stdout(buffer):
+                exit_code = cli.main(["doctor"])
 
         self.assertEqual(exit_code, ExitCode.AUTH)
         self.assertIn("MINIMAX_API_KEY", buffer.getvalue())
@@ -145,6 +188,24 @@ class CLITests(unittest.TestCase):
             self.assertEqual(exit_code, ExitCode.OK)
             self.assertTrue((output_dir / "0001.mp3").exists())
 
+    def test_run_subcommand_executes_batch_flow(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            input_path.write_text("第一段", encoding="utf-8")
+            response = MockResponse(
+                200,
+                {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
+            )
+
+            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+                with patch("voice_dashboard.pipeline.requests.post", return_value=response):
+                    exit_code = cli.main(
+                        ["run", str(input_path), "--output-dir", str(output_dir)]
+                    )
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertTrue((output_dir / "0001.mp3").exists())
+
     def test_config_values_are_used_when_cli_flags_are_absent(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             input_path = Path(temp_dir) / "input.txt"
@@ -186,6 +247,34 @@ class CLITests(unittest.TestCase):
             self.assertEqual(payload["voice_setting"]["speed"], 1.6)
             self.assertEqual(payload["voice_setting"]["pitch"], 2)
             self.assertEqual(payload["audio_setting"]["sample_rate"], 44100)
+
+    def test_config_show_subcommand_prints_effective_config(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "defaults": {
+                            "voice_id": "cfg-voice",
+                            "output_root": str(Path(temp_dir) / "tts-output"),
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            buffer = io.StringIO()
+
+            with redirect_stdout(buffer):
+                exit_code = cli.main(
+                    ["config", "show", "--config", str(config_path)]
+                )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            payload = json.loads(buffer.getvalue())
+            self.assertEqual(payload["defaults"]["voice_id"], "cfg-voice")
+            self.assertEqual(payload["config_path"], str(config_path))
+            self.assertTrue(payload["config_exists"])
 
 
 class InputSourceTests(unittest.TestCase):

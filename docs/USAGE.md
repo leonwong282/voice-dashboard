@@ -50,6 +50,7 @@ Then verify:
 
 ```bash
 ttsrun --help
+ttsrun doctor
 ```
 
 ### 3.2 Editable install for contributors
@@ -78,6 +79,12 @@ python3 voice.py --help
 
 ```bash
 ttsrun examples/sample.txt
+```
+
+Explicit command form:
+
+```bash
+ttsrun run examples/sample.txt
 ```
 
 ### 4.2 Clipboard input (macOS)
@@ -148,19 +155,25 @@ Default config path:
 Print a config example:
 
 ```bash
-ttsrun --print-config-example
+ttsrun config example
 ```
 
 Print the resolved config path:
 
 ```bash
-ttsrun --print-config-path
+ttsrun config path
 ```
 
 Create an example config file:
 
 ```bash
-ttsrun --init-config
+ttsrun config init
+```
+
+Show the effective configuration, including resolved metadata:
+
+```bash
+ttsrun config show
 ```
 
 You can save and customize output as `~/.voice-dashboard.json`, for example:
@@ -213,6 +226,12 @@ ttsrun examples/sample.txt --config /path/to/config.json
   - `--json-summary`
 - Management commands:
   - `--version`
+  - `doctor`
+  - `config path`
+  - `config show`
+  - `config example`
+  - `config init`
+- Legacy compatibility flags:
   - `--doctor`
   - `--print-config-path`
   - `--print-config-example`
@@ -239,15 +258,16 @@ ttsrun examples/sample.txt --config /path/to/config.json
 Run a quick environment report:
 
 ```bash
-ttsrun --doctor
+ttsrun doctor
 ```
 
 ## 10. Output Streams
 
 - stdout is used for explicit command output such as:
   - `--version`
-  - `--print-config-path`
-  - `--print-config-example`
+  - `ttsrun config path`
+  - `ttsrun config example`
+  - `ttsrun config show`
   - `--json-summary`
 - stderr is used for progress lines, warnings, and errors during batch execution.
 - `--quiet` suppresses progress output while still allowing warnings and errors.

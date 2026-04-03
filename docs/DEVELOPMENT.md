@@ -33,6 +33,7 @@ Run individual steps:
 ```bash
 make lint
 make test
+make smoke
 make build
 ```
 
@@ -41,6 +42,8 @@ If you prefer not to use `make`, the equivalent commands are:
 ```bash
 python -m pyflakes voice.py voice_dashboard tests
 python -m pytest -q
+ttsrun --help
+MINIMAX_API_KEY=smoke-test-key ttsrun doctor
 python -m build
 python -m twine check dist/*
 ```
@@ -51,6 +54,10 @@ After the editable install succeeds, verify the CLI entrypoint:
 
 ```bash
 ttsrun --help
+ttsrun --version
+MINIMAX_API_KEY=smoke-test-key ttsrun doctor
+ttsrun config path
+ttsrun config example
 ```
 
 ## 5. Repository Hygiene
@@ -74,6 +81,7 @@ The CI workflow validates three things on every change:
 
 - linting with Pyflakes
 - tests with Pytest
+- install-time CLI smoke checks through `ttsrun`
 - package build validation with `python -m build`
 
 Any local change should pass the same checks before release work begins.

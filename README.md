@@ -73,13 +73,24 @@ pbpaste | ttsrun --stdin --merge
 - `--open`: open output directory after completion.
 - `--config <path>`: use a specific config file.
 - `--version`: print the installed CLI version.
-- `--doctor`: inspect config, API key, and optional dependencies.
-- `--print-config-path`: print the resolved config path.
-- `--print-config-example`: print a sample config JSON.
-- `--init-config`: write an example config file.
-- `--force`: overwrite an existing config file when used with `--init-config`.
+- `doctor`: inspect config, API key, and optional dependencies.
+- `config path`: print the resolved config path.
+- `config show`: print the effective config as JSON.
+- `config example`: print a sample config JSON.
+- `config init`: write an example config file.
 - `--quiet` / `--verbose`: control progress output on stderr.
 - `--json-summary`: print the final manifest summary as JSON.
+
+Preferred management commands:
+
+```bash
+ttsrun doctor
+ttsrun config path
+ttsrun config show
+ttsrun config init
+```
+
+`ttsrun run <input_path>` is also supported as an explicit batch subcommand. The older management flags remain available for compatibility.
 
 ## 📖 Documentation
 

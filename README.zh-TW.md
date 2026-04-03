@@ -73,13 +73,24 @@ pbpaste | ttsrun --stdin --merge
 - `--open`：完成後嘗試打開輸出目錄。
 - `--config <path>`：使用指定設定檔。
 - `--version`：輸出目前 CLI 版本。
-- `--doctor`：檢查設定檔、API key 與可選依賴。
-- `--print-config-path`：輸出實際設定檔路徑。
-- `--print-config-example`：輸出設定檔範例。
-- `--init-config`：寫入一份設定檔範例。
-- `--force`：搭配 `--init-config` 覆寫既有設定檔。
+- `doctor`：檢查設定檔、API key 與可選依賴。
+- `config path`：輸出實際設定檔路徑。
+- `config show`：以 JSON 顯示目前生效設定。
+- `config example`：輸出設定檔範例。
+- `config init`：寫入一份設定檔範例。
 - `--quiet` / `--verbose`：控制 stderr 上的進度輸出。
 - `--json-summary`：以 JSON 輸出最終摘要。
+
+建議優先使用新的管理子命令：
+
+```bash
+ttsrun doctor
+ttsrun config path
+ttsrun config show
+ttsrun config init
+```
+
+也支援用 `ttsrun run <input_path>` 明確執行批次流程。舊的管理 flags 仍保留作為相容層。
 
 ## 📖 文件
 

@@ -56,12 +56,23 @@ def _coerce_bool(value: Any, field_name: str) -> bool:
 
 
 def example_config() -> dict[str, Any]:
-    config = AppConfig()
+    return serialize_config(AppConfig())
+
+
+def serialize_config(
+    config: AppConfig,
+    include_metadata: bool = False,
+) -> dict[str, Any]:
     data = asdict(config)
     data["output_root"] = str(config.output_root)
     data["format"] = data.pop("audio_format")
     data.pop("config_path", None)
-    return {"defaults": data}
+
+    payload: dict[str, Any] = {"defaults": data}
+    if include_metadata:
+        payload["config_path"] = str(config.config_path)
+        payload["config_exists"] = config.config_path.exists()
+    return payload
 
 
 def resolve_config_path(config_path: str | None) -> Path:
