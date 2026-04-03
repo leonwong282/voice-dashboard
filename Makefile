@@ -1,6 +1,8 @@
 PYTHON ?= python3
 
-.PHONY: dev lint test smoke build dist-sha256 homebrew-formula release-smoke check clean
+.PHONY: dev lint test smoke build dist-sha256 homebrew-formula public-install-smoke release-smoke check clean
+
+PACKAGE_SPEC ?= dist/*.whl
 
 dev:
 	$(PYTHON) -m pip install --upgrade pip
@@ -30,6 +32,9 @@ dist-sha256: build
 
 homebrew-formula:
 	$(PYTHON) scripts/render_homebrew_formula.py --source-url "$(SOURCE_URL)" --source-sha256 "$(SOURCE_SHA256)"
+
+public-install-smoke:
+	$(PYTHON) scripts/verify_public_install.py --package-spec '$(PACKAGE_SPEC)'
 
 release-smoke: build
 	tmpdir=$$(mktemp -d); \

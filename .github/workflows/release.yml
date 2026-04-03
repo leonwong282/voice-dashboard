@@ -35,9 +35,68 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  public-install-smoke:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: pypi-publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify published pip and pipx install paths
+        run: |
+          python scripts/verify_public_install.py \
+            --package-spec "voice-dashboard==${GITHUB_REF_NAME#v}"
+
+  homebrew-formula:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: pypi-publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install script dependencies
+        run: python -m pip install -e .
+
+      - name: Render Homebrew formula for this tag
+        run: |
+          mkdir -p release-assets
+          source_url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz"
+          curl -fsSL "$source_url" -o release-assets/source.tar.gz
+          source_sha256="$(sha256sum release-assets/source.tar.gz | awk '{print $1}')"
+          python scripts/render_homebrew_formula.py \
+            --source-url "$source_url" \
+            --source-sha256 "$source_sha256" \
+            --output release-assets/voice-dashboard.rb
+          rm -f release-assets/source.tar.gz
+
+      - name: Upload Homebrew formula artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homebrew-formula
+          path: release-assets/voice-dashboard.rb
+          if-no-files-found: error
+
   github-release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs:
+      - build
+      - pypi-publish
+      - public-install-smoke
+      - homebrew-formula
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -49,14 +108,20 @@ jobs:
           name: dist
           path: dist
 
+      - name: Download Homebrew formula artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: homebrew-formula
+          path: release-assets
+
       - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+            gh release upload "$GITHUB_REF_NAME" dist/* release-assets/* --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes
+            gh release create "$GITHUB_REF_NAME" dist/* release-assets/* --verify-tag --generate-notes
           fi
 
   pypi-publish:

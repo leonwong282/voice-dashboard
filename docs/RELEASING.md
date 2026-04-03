@@ -43,8 +43,10 @@ The release workflow then:
 2. Runs `make check release-smoke`.
 3. Builds `sdist` and `wheel` artifacts.
 4. Uploads `dist/*` as workflow artifacts.
-5. Creates or updates the matching GitHub Release and attaches the built distributions.
-6. Publishes the same distributions to PyPI through Trusted Publishing.
+5. Publishes the same distributions to PyPI through Trusted Publishing.
+6. Verifies `voice-dashboard==<tag-version>` through real `pip` and `pipx` installs from PyPI.
+7. Renders a Homebrew formula asset for the same tag.
+8. Creates or updates the matching GitHub Release and attaches both the built distributions and the rendered formula.
 
 You can also run the workflow manually with `workflow_dispatch` to rehearse the build and artifact path without creating a published release.
 
@@ -76,6 +78,8 @@ For a repeatable scripted check, use:
 python scripts/verify_public_install.py --package-spec voice-dashboard==0.4.0
 ```
 
+The same verification now runs automatically in the tag-driven release workflow after PyPI publication succeeds.
+
 ## 5. Homebrew Follow-Up
 
 Homebrew support should be added only after the PyPI release path is stable. Once the first public PyPI release is verified, use the GitHub Release artifacts from the matching tag as the input for a tap formula.
@@ -95,3 +99,5 @@ python scripts/render_homebrew_formula.py \
   --source-url https://github.com/leonwong282/voice-dashboard/archive/refs/tags/v0.4.0.tar.gz \
   --source-sha256 <sha256>
 ```
+
+The release workflow now attaches the rendered `voice-dashboard.rb` file to the matching GitHub Release so the tap update can start from a concrete artifact instead of a manual copy step.

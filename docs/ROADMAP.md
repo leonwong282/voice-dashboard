@@ -184,6 +184,7 @@ Progress notes:
 - A Homebrew packaging guide and formula template now exist so tap work can start from a repeatable baseline.
 - A reusable public-install smoke workflow and helper script now exist for verifying published `pip` and `pipx` installation paths.
 - A Homebrew formula renderer now converts the repository template plus resolved Python resources into a concrete formula body.
+- The main release workflow now includes post-publish install verification from PyPI and publishes a rendered Homebrew formula artifact alongside the release assets.
 
 Suggested release label:
 
