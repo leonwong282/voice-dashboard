@@ -71,13 +71,13 @@ jobs:
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
+          remote_url="https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/leonwong282/homebrew-tap.git"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/leonwong282/homebrew-tap.git"
-          git ls-remote --exit-code origin HEAD >/dev/null
+          git ls-remote --exit-code "$remote_url" HEAD >/dev/null
           git add Formula/voice-dashboard.rb
           git commit -m "Update voice-dashboard ${{ inputs.package_version }}"
-          git push origin HEAD:$(git branch --show-current)
+          git push "$remote_url" HEAD:$(git branch --show-current)
 
       - name: Report no-op tap publish
         if: steps.tap-update.outputs.changed != 'true'
