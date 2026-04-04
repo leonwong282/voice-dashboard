@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-04-04
+
 ### Changed
+- Hardened Homebrew tap publishing so workflows no longer rewrite the local `origin` remote with an embedded token before pushing.
 - Release and Homebrew maintainer docs now document the minimal fine-grained PAT permissions for `HOMEBREW_TAP_TOKEN`.
 - Release docs now include the `publish-homebrew.yml` recovery path for cases where PyPI publication succeeds before Homebrew publication fails.
 
@@ -70,7 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `README-old.md`
   - `docs/USAGE-old.md`
 
-[Unreleased]: https://github.com/leonwong282/voice-dashboard/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/leonwong282/voice-dashboard/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.4.4
 [0.4.3]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.4.3
 [0.4.2]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.4.2
 [0.1.0]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.1.0
