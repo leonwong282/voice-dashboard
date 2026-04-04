@@ -121,26 +121,26 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Add ElevenLabs provider registration.
-- [ ] Implement `POST /v1/text-to-speech/:voice_id`.
-- [ ] Send auth via `xi-api-key`.
-- [ ] Use an MP3 output format that is fixed and documented for the MVP.
-- [ ] Map common request fields:
+- [x] Add ElevenLabs provider registration.
+- [x] Implement `POST /v1/text-to-speech/:voice_id`.
+- [x] Send auth via `xi-api-key`.
+- [x] Use an MP3 output format that is fixed and documented for the MVP.
+- [x] Map common request fields:
   - `text`
   - `voice_id`
   - `model`
   - optional `speed`
-- [ ] Encode ElevenLabs request JSON correctly.
-- [ ] Decode raw audio bytes from the response body.
-- [ ] Handle retryable network and `5xx` failures consistently with the existing retry model.
-- [ ] Handle `401` and `403` as authentication errors.
-- [ ] Parse non-success errors into stable user-facing messages.
+- [x] Encode ElevenLabs request JSON correctly.
+- [x] Decode raw audio bytes from the response body.
+- [x] Handle retryable network and `5xx` failures consistently with the existing retry model.
+- [x] Handle `401` and `403` as authentication errors.
+- [x] Parse non-success errors into stable user-facing messages.
 
 Acceptance:
 
-- [ ] A successful ElevenLabs request writes a playable MP3 file.
-- [ ] Retry behavior works for transient failures.
-- [ ] Auth failures produce clear provider-specific errors.
+- [x] A successful ElevenLabs request writes a playable MP3 file.
+- [x] Retry behavior works for transient failures.
+- [x] Auth failures produce clear provider-specific errors.
 
 ## 8. Phase 5: Validate Provider-Specific Option Boundaries
 
@@ -192,30 +192,30 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Keep current MiniMax regression coverage passing.
-- [ ] Add provider resolution tests:
+- [x] Keep current MiniMax regression coverage passing.
+- [x] Add provider resolution tests:
   - CLI overrides config
   - config overrides default
   - default falls back to MiniMax
-- [ ] Add API key tests:
+- [x] Add API key tests:
   - MiniMax requires `MINIMAX_API_KEY`
   - ElevenLabs requires `ELEVENLABS_API_KEY`
-- [ ] Add ElevenLabs request tests:
+- [x] Add ElevenLabs request tests:
   - path includes `voice_id`
   - correct auth header
   - correct query parameter for output format
   - correct JSON body for text/model/speed
-- [ ] Add ElevenLabs response tests:
+- [x] Add ElevenLabs response tests:
   - success writes binary audio
   - `401` and `403` map to auth failure
   - network errors and `5xx` retry
 - [ ] Add CLI validation tests for provider-specific flag rejection.
-- [ ] Add `doctor` tests for provider-aware environment validation.
+- [x] Add `doctor` tests for provider-aware environment validation.
 
 Acceptance:
 
-- [ ] `pytest -q` passes locally.
-- [ ] No MiniMax regression is introduced.
+- [x] `pytest -q` passes locally.
+- [x] No MiniMax regression is introduced.
 
 ## 11. Phase 8: Documentation Updates
 

@@ -17,10 +17,11 @@ from voice_dashboard.errors import ExitCode
 
 
 class MockResponse:
-    def __init__(self, status_code, payload=None, text=""):
+    def __init__(self, status_code, payload=None, text="", content=b""):
         self.status_code = status_code
         self._payload = payload
         self.text = text
+        self.content = content
 
     def json(self):
         if isinstance(self._payload, Exception):
@@ -1060,24 +1061,44 @@ class BatchFlowTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            stderr_buffer = io.StringIO()
+            response = MockResponse(200, content=b"ELVN")
 
             with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}, clear=True):
-                with patch("voice_dashboard.pipeline.requests.post") as mock_post:
-                    with redirect_stderr(stderr_buffer):
-                        exit_code = cli.main(
-                            [
-                                str(input_path),
-                                "--config",
-                                str(config_path),
-                                "--output-dir",
-                                str(output_dir),
-                            ]
-                        )
+                with patch(
+                    "voice_dashboard.providers.elevenlabs.requests.post",
+                    return_value=response,
+                ) as mock_post:
+                    exit_code = cli.main(
+                        [
+                            str(input_path),
+                            "--config",
+                            str(config_path),
+                            "--output-dir",
+                            str(output_dir),
+                        ]
+                    )
 
-            self.assertEqual(exit_code, ExitCode.API)
-            self.assertEqual(mock_post.call_count, 0)
-            self.assertIn("Provider 'elevenlabs' is configured", stderr_buffer.getvalue())
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual((output_dir / "0001.mp3").read_bytes(), b"ELVN")
+            self.assertEqual(
+                mock_post.call_args.args[0],
+                "https://api.elevenlabs.io/v1/text-to-speech/voice-123",
+            )
+            self.assertEqual(
+                mock_post.call_args.kwargs["headers"]["xi-api-key"], "test-key"
+            )
+            self.assertEqual(
+                mock_post.call_args.kwargs["params"]["output_format"],
+                "mp3_44100_128",
+            )
+            self.assertEqual(
+                mock_post.call_args.kwargs["json"]["model_id"],
+                "eleven-model",
+            )
+            self.assertEqual(
+                mock_post.call_args.kwargs["json"]["voice_settings"]["speed"],
+                1.2,
+            )
 
     def test_cli_provider_overrides_config_provider(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1098,7 +1119,7 @@ class BatchFlowTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            stderr_buffer = io.StringIO()
+            response = MockResponse(200, content=b"ELVN")
 
             with patch.dict(
                 os.environ,
@@ -1108,8 +1129,11 @@ class BatchFlowTests(unittest.TestCase):
                 },
                 clear=True,
             ):
-                with patch("voice_dashboard.pipeline.requests.post") as mock_post:
-                    with redirect_stderr(stderr_buffer):
+                with patch("voice_dashboard.pipeline.requests.post") as minimax_post:
+                    with patch(
+                        "voice_dashboard.providers.elevenlabs.requests.post",
+                        return_value=response,
+                    ) as elevenlabs_post:
                         exit_code = cli.main(
                             [
                                 str(input_path),
@@ -1122,9 +1146,178 @@ class BatchFlowTests(unittest.TestCase):
                             ]
                         )
 
-            self.assertEqual(exit_code, ExitCode.API)
-            self.assertEqual(mock_post.call_count, 0)
-            self.assertIn("Provider 'elevenlabs' is configured", stderr_buffer.getvalue())
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual(minimax_post.call_count, 0)
+            self.assertEqual(elevenlabs_post.call_count, 1)
+            self.assertTrue((output_dir / "0001.mp3").exists())
+
+    def test_elevenlabs_uses_provider_default_model_when_legacy_default_model_is_present(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            config_path = Path(temp_dir) / "config.json"
+            input_path.write_text("第一段", encoding="utf-8")
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider": "elevenlabs",
+                        "defaults": {
+                            "voice_id": "voice-123",
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            response = MockResponse(200, content=b"ELVN")
+
+            with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}, clear=True):
+                with patch(
+                    "voice_dashboard.providers.elevenlabs.requests.post",
+                    return_value=response,
+                ) as mock_post:
+                    exit_code = cli.main(
+                        [
+                            str(input_path),
+                            "--config",
+                            str(config_path),
+                            "--output-dir",
+                            str(output_dir),
+                        ]
+                    )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual(
+                mock_post.call_args.kwargs["json"]["model_id"],
+                "eleven_multilingual_v2",
+            )
+
+    def test_elevenlabs_auth_failure_returns_auth_exit_code(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            input_path.write_text("第一段", encoding="utf-8")
+            response = MockResponse(
+                401,
+                payload={"detail": {"message": "Unauthorized"}},
+                text='{"detail":{"message":"Unauthorized"}}',
+            )
+
+            with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}, clear=True):
+                with patch(
+                    "voice_dashboard.providers.elevenlabs.requests.post",
+                    return_value=response,
+                ):
+                    exit_code = cli.main(
+                        [
+                            str(input_path),
+                            "--provider",
+                            "elevenlabs",
+                            "--voice-id",
+                            "voice-123",
+                            "--model",
+                            "eleven-model",
+                            "--output-dir",
+                            str(output_dir),
+                        ]
+                    )
+
+            self.assertEqual(exit_code, ExitCode.AUTH)
+
+    def test_elevenlabs_403_returns_auth_exit_code(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            input_path.write_text("第一段", encoding="utf-8")
+            response = MockResponse(
+                403,
+                payload={"detail": {"message": "Forbidden"}},
+                text='{"detail":{"message":"Forbidden"}}',
+            )
+
+            with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}, clear=True):
+                with patch(
+                    "voice_dashboard.providers.elevenlabs.requests.post",
+                    return_value=response,
+                ):
+                    exit_code = cli.main(
+                        [
+                            str(input_path),
+                            "--provider",
+                            "elevenlabs",
+                            "--voice-id",
+                            "voice-123",
+                            "--model",
+                            "eleven-model",
+                            "--output-dir",
+                            str(output_dir),
+                        ]
+                    )
+
+            self.assertEqual(exit_code, ExitCode.AUTH)
+
+    def test_elevenlabs_retryable_request_is_retried(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            input_path.write_text("第一段", encoding="utf-8")
+            success_response = MockResponse(200, content=b"ELVN")
+
+            with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}, clear=True):
+                with patch(
+                    "voice_dashboard.providers.elevenlabs.requests.post",
+                    side_effect=[requests.ConnectionError("temporary"), success_response],
+                ) as mock_post:
+                    with patch("voice_dashboard.pipeline.time.sleep"):
+                        exit_code = cli.main(
+                            [
+                                str(input_path),
+                                "--provider",
+                                "elevenlabs",
+                                "--voice-id",
+                                "voice-123",
+                                "--model",
+                                "eleven-model",
+                                "--output-dir",
+                                str(output_dir),
+                            ]
+                        )
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual(mock_post.call_count, 2)
+
+    def test_elevenlabs_http_503_is_retried(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            input_path.write_text("第一段", encoding="utf-8")
+            retry_response = MockResponse(
+                503,
+                payload={"detail": {"message": "temporary outage"}},
+                text='{"detail":{"message":"temporary outage"}}',
+            )
+            success_response = MockResponse(200, content=b"ELVN")
+
+            with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}, clear=True):
+                with patch(
+                    "voice_dashboard.providers.elevenlabs.requests.post",
+                    side_effect=[retry_response, success_response],
+                ) as mock_post:
+                    with patch("voice_dashboard.pipeline.time.sleep"):
+                        exit_code = cli.main(
+                            [
+                                str(input_path),
+                                "--provider",
+                                "elevenlabs",
+                                "--voice-id",
+                                "voice-123",
+                                "--model",
+                                "eleven-model",
+                                "--output-dir",
+                                str(output_dir),
+                            ]
+                        )
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual(mock_post.call_count, 2)
 
     def test_json_summary_prints_summary_to_stdout(self):
         with tempfile.TemporaryDirectory() as temp_dir:
