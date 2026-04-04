@@ -1,0 +1,106 @@
+name: Publish Homebrew Formula
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_version:
+        description: "Published package version, such as 0.4.3"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require tap publish token
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$HOMEBREW_TAP_TOKEN" ]; then
+            echo "Missing repository secret HOMEBREW_TAP_TOKEN." >&2
+            echo "Create a fine-grained GitHub token with contents write access to leonwong282/homebrew-tap." >&2
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install script dependencies
+        run: python -m pip install -e .
+
+      - name: Render Homebrew formula from published package
+        run: |
+          mkdir -p release-assets
+          python scripts/render_homebrew_formula.py \
+            --package-version "${{ inputs.package_version }}" \
+            --output release-assets/voice-dashboard.rb
+
+      - name: Check out Homebrew tap
+        uses: actions/checkout@v5
+        with:
+          repository: leonwong282/homebrew-tap
+          ref: main
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+          persist-credentials: false
+
+      - name: Update tap formula
+        id: tap-update
+        working-directory: homebrew-tap
+        run: |
+          mkdir -p Formula
+          cp "$GITHUB_WORKSPACE/release-assets/voice-dashboard.rb" Formula/voice-dashboard.rb
+          if [ -n "$(git status --porcelain -- Formula/voice-dashboard.rb)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push tap update
+        if: steps.tap-update.outputs.changed == 'true'
+        working-directory: homebrew-tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/leonwong282/homebrew-tap.git"
+          git ls-remote --exit-code origin HEAD >/dev/null
+          git add Formula/voice-dashboard.rb
+          git commit -m "Update voice-dashboard ${{ inputs.package_version }}"
+          git push origin HEAD:$(git branch --show-current)
+
+      - name: Report no-op tap publish
+        if: steps.tap-update.outputs.changed != 'true'
+        run: echo "Homebrew formula already matches the rendered release artifact."
+
+  install-smoke:
+    needs: publish
+    runs-on: macos-latest
+
+    steps:
+      - name: Tap published formula
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+        run: brew tap leonwong282/tap
+
+      - name: Install published Homebrew formula
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_FROM_API: "1"
+        run: brew install leonwong282/tap/voice-dashboard
+
+      - name: Verify installed CLI
+        run: |
+          ttsrun --version
+          ttsrun --help >/dev/null
+          brew test leonwong282/tap/voice-dashboard

@@ -137,6 +137,7 @@ jobs:
           ref: main
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap
+          persist-credentials: false
 
       - name: Update tap formula
         id: tap-update
@@ -153,9 +154,13 @@ jobs:
       - name: Commit and push tap update
         if: steps.tap-update.outputs.changed == 'true'
         working-directory: homebrew-tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/leonwong282/homebrew-tap.git"
+          git ls-remote --exit-code origin HEAD >/dev/null
           git add Formula/voice-dashboard.rb
           git commit -m "Update voice-dashboard ${GITHUB_REF_NAME#v}"
           git push origin HEAD:$(git branch --show-current)
