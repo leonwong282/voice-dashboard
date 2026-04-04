@@ -196,6 +196,8 @@ Suggested release label:
 
 ### Milestone P3: Reliability, Supportability, And v1.0 Readiness
 
+Status: planned on 2026-04-04.
+
 Target outcome: the project is credible as a maintained CLI product.
 
 Key work:
@@ -222,6 +224,76 @@ Acceptance criteria:
 - Maintainers can release confidently from a written checklist.
 - Users can install and use the tool through documented channels without guessing.
 - The project has a clear support boundary and stable public interface.
+
+Execution plan:
+
+1. P3.1 Test Hardening
+   - Add CLI integration tests that execute the installed command through subprocesses.
+   - Add config-path and config-migration coverage for both XDG-style and legacy config locations.
+   - Add failure-mode coverage for invalid config, missing API key, missing clipboard backend, and missing `ffmpeg`.
+   - Add regression coverage for `scripts/verify_public_install.py` retry behavior.
+   - Exit criteria:
+     - Integration tests run in CI.
+     - Release helper scripts have direct test coverage.
+     - Critical error paths are covered by tests instead of only manual verification.
+
+2. P3.2 Operational Hardening
+   - Review retry and timeout boundaries in the MiniMax request path.
+   - Make overwrite and output-directory behavior explicit when a target path already exists.
+   - Tighten merge and cleanup safety so partial failures never delete successful outputs unexpectedly.
+   - Review stderr/stdout behavior and exit codes for automation stability.
+   - Exit criteria:
+     - Error handling is predictable for partial-success and dependency-failure scenarios.
+     - Cleanup behavior is documented and tested.
+     - No known ambiguous overwrite paths remain.
+
+3. P3.3 Maintainer Process Docs
+   - Add a release checklist document for preflight, tagging, post-release checks, and recovery.
+   - Add a compatibility/support policy covering supported Python versions, platforms, and external dependencies.
+   - Add a contributor-facing maintenance guide for triaging bugs and validating fixes.
+   - Exit criteria:
+     - A maintainer can follow written docs to release, recover, and support the project without relying on chat history.
+
+4. P3.4 Public Maintenance Scaffolding
+   - Add GitHub issue templates for bug reports and feature requests.
+   - Add a user-facing support boundary document or section covering what is and is not supported.
+   - Review whether a dedicated `CONTRIBUTING.md` should be added instead of relying only on development docs.
+   - Exit criteria:
+     - New issues arrive with enough structure to reproduce problems.
+     - Public maintenance expectations are explicit.
+
+Recommended file-level work:
+
+- `tests/`
+  - add integration-style CLI tests
+  - add release-helper tests
+- `voice_dashboard/pipeline.py`
+  - tighten retry, timeout, cleanup, and overwrite behavior
+- `voice_dashboard/config.py`
+  - harden config discovery, migration, and validation edge cases
+- `docs/`
+  - add release checklist
+  - add compatibility/support policy
+  - refine maintainer-facing guides
+- `.github/`
+  - add issue templates for bugs and feature requests
+
+Suggested execution order inside P3:
+
+1. Ship P3.1 first so later refactors have safety coverage.
+2. Use P3.2 to harden runtime behavior once tests can catch regressions.
+3. Close P3.3 and P3.4 after the runtime and release workflows are stable enough to document cleanly.
+
+Recommended release slices:
+
+- `0.5.x`: test hardening
+- `0.6.x`: runtime hardening and safer operational behavior
+- `0.7.x`: maintainer docs, support policy, and issue templates
+- `1.0.0`: freeze interface expectations and declare support boundary
+
+Working checklist:
+
+- `docs/P3_CHECKLIST.md`
 
 Suggested release label:
 
@@ -260,10 +332,10 @@ The following items may be valuable, but they should not block productization:
 
 The highest-value next moves are:
 
-1. Expand CLI and integration-style test coverage around real config files, failure modes, and packaging boundaries.
-2. Write a maintainer release checklist that covers recovery paths, rollback expectations, and support boundaries.
-3. Tighten documentation for supported platforms, environment assumptions, and operational limits.
-4. Review contribution and issue-management docs for a broader public maintenance model.
+1. Add subprocess-driven CLI integration tests under `tests/`.
+2. Add a maintainer release checklist document under `docs/`.
+3. Review `pipeline.py` for timeout, retry, and cleanup edge cases before changing user-facing behavior further.
+4. Add GitHub issue templates so incoming bug reports become reproducible.
 
 ## 10. Success Metrics
 
