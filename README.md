@@ -4,7 +4,7 @@
 
 # 🎙️ Voice Dashboard
 
-> A practical MiniMax batch Text-to-Speech CLI for daily workflows.
+> A practical batch Text-to-Speech CLI for MiniMax and ElevenLabs workflows.
 
 ![Version](https://img.shields.io/badge/Version-0.7.2-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
@@ -19,6 +19,8 @@
 
 ## ✨ Features
 
+- TTS-only design: bring your own `voice_id`; no voice management commands.
+- Multi-provider support with `--provider` or config default selection.
 - Plain-text paragraph splitting by empty lines, generating one MP3 per segment.
 - Three input sources (choose one):
   - File path: `ttsrun <file.txt>`
@@ -38,7 +40,11 @@
 ### 1) Set API key
 
 ```bash
+# MiniMax
 export MINIMAX_API_KEY="your_new_key"
+
+# ElevenLabs
+export ELEVENLABS_API_KEY="your_elevenlabs_key"
 ```
 
 ### 2) Install
@@ -72,8 +78,11 @@ For contributor setup, use the development guide and editable install instead.
 ### 3) Run
 
 ```bash
-# File input
-ttsrun examples/sample.txt
+# MiniMax file input
+ttsrun --provider minimax --voice-id clone_voice_can examples/sample.txt
+
+# ElevenLabs file input
+ttsrun --provider elevenlabs --voice-id JBFqnCBsd6RMkjVDRZzb examples/sample.txt
 
 # Stdin input
 pbpaste | ttsrun --stdin
@@ -84,14 +93,18 @@ pbpaste | ttsrun --stdin --merge
 
 ## ⚙️ Common Options
 
+- `--provider {minimax,elevenlabs}`: choose the active TTS provider.
 - `--output-dir <dir>`: write outputs to a fixed directory.
 - `--force-output-dir`: allow reusing a non-empty `--output-dir`.
 - `--output-root <dir>`: set the default output root.
 - `--name <label>`: customize job folder suffix.
+- `--voice-id <id>`: use an existing provider voice ID.
+- `--model <name>` / `--speed <multiplier>`: common voice controls.
+- `--pitch` / `--language-boost` / `--sample-rate`: MiniMax-only controls.
 - `--merge`: merge all successful segments and remove segment files.
 - `--open`: open output directory after completion.
 - `--config <path>`: use a specific config file.
-- `--request-timeout <seconds>` / `--max-retries <count>`: tune MiniMax request boundaries.
+- `--request-timeout <seconds>` / `--max-retries <count>`: tune provider request boundaries.
 - `--version`: print the installed CLI version.
 - `doctor`: inspect config, API key, and optional dependencies.
 - `config path`: print the resolved config path.
@@ -102,6 +115,15 @@ pbpaste | ttsrun --stdin --merge
 - `--json-summary`: print the final manifest summary as JSON.
 
 If an explicit `--output-dir` already exists and is not empty, `ttsrun` stops by default instead of silently mixing runs. Use `--force-output-dir` only when overwriting generated files is intentional.
+
+Set a default provider in config if you do not want to pass `--provider` every time.
+
+Current ElevenLabs MVP limits:
+
+- bring your own existing `voice_id`
+- fixed MP3 output profile
+- common controls such as `--voice-id`, `--model`, and `--speed`
+- MiniMax-only flags such as `--pitch`, `--language-boost`, and `--sample-rate` are rejected
 
 Preferred management commands:
 

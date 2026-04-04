@@ -48,6 +48,7 @@ python -m pyflakes voice.py voice_dashboard tests scripts
 python -m pytest -q
 ttsrun --help
 MINIMAX_API_KEY=smoke-test-key ttsrun doctor
+ELEVENLABS_API_KEY=smoke-test-key ttsrun doctor --provider elevenlabs
 python -m build
 python -m twine check dist/*
 ```
@@ -60,6 +61,7 @@ After the editable install succeeds, verify the CLI entrypoint:
 ttsrun --help
 ttsrun --version
 MINIMAX_API_KEY=smoke-test-key ttsrun doctor
+ELEVENLABS_API_KEY=smoke-test-key ttsrun doctor --provider elevenlabs
 ttsrun config path
 ttsrun config example
 ```

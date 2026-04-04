@@ -37,7 +37,9 @@ Source installs from a checked-out repository are supported for contributors, bu
 
 Required:
 
-- `MINIMAX_API_KEY` must be set before batch synthesis.
+- the active provider API key must be set before batch synthesis
+  - `MINIMAX_API_KEY` for `--provider minimax`
+  - `ELEVENLABS_API_KEY` for `--provider elevenlabs`
 
 Optional, depending on workflow:
 
@@ -58,6 +60,7 @@ If these optional tools are missing, `ttsrun doctor` should explain the gap and 
 The following interfaces are treated as public and should remain stable unless a documented breaking release is planned:
 
 - the `ttsrun` command entrypoint
+- provider selection through `--provider` and config `provider`
 - the command-oriented management surface:
   - `ttsrun doctor`
   - `ttsrun config path`
@@ -85,7 +88,7 @@ Maintainers do not guarantee:
 - support for outdated package versions after newer releases ship
 - support for undocumented environment combinations
 - support for hand-edited or externally mutated output directories beyond the documented overwrite rules
-- immediate fixes for third-party service outages or MiniMax-side API changes
+- immediate fixes for third-party service outages or provider-side API changes
 
 ## 7. What To Include In Bug Reports
 
@@ -95,6 +98,7 @@ When reporting a bug, include:
 - install channel: `pipx`, `pip`, or `Homebrew`
 - Python version
 - OS and shell
+- active provider: `minimax` or `elevenlabs`
 - whether `ffmpeg` or clipboard tooling is involved
 - the exact command used
 - stderr output or relevant `manifest.json` / `errors.jsonl` excerpts

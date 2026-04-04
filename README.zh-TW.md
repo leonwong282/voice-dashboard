@@ -4,7 +4,7 @@
 
 # 🎙️ voice-dashboard
 
-> 日常可用的 MiniMax 批量文字轉語音（TTS）命令列工具。
+> 適用於 MiniMax 與 ElevenLabs 的批量文字轉語音（TTS）命令列工具。
 
 ![Version](https://img.shields.io/badge/Version-0.7.2-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
@@ -19,6 +19,8 @@
 
 ## ✨ 核心能力
 
+- 僅處理 TTS：自行提供 `voice_id`，不包含 voice 管理命令。
+- 支援多 provider，可用 `--provider` 或設定檔決定預設值。
 - 純文本以空行分段，逐段產生 MP3。
 - 三種輸入來源（三選一）：
   - 檔案：`ttsrun <file.txt>`
@@ -38,7 +40,11 @@
 ### 1) 設定 API Key
 
 ```bash
+# MiniMax
 export MINIMAX_API_KEY="你的新 key"
+
+# ElevenLabs
+export ELEVENLABS_API_KEY="你的 ElevenLabs key"
 ```
 
 ### 2) 安裝
@@ -72,8 +78,11 @@ brew install leonwong282/tap/voice-dashboard
 ### 3) 執行
 
 ```bash
-# 檔案輸入
-ttsrun examples/sample.txt
+# MiniMax 檔案輸入
+ttsrun --provider minimax --voice-id clone_voice_can examples/sample.txt
+
+# ElevenLabs 檔案輸入
+ttsrun --provider elevenlabs --voice-id JBFqnCBsd6RMkjVDRZzb examples/sample.txt
 
 # stdin 輸入
 pbpaste | ttsrun --stdin
@@ -84,14 +93,18 @@ pbpaste | ttsrun --stdin --merge
 
 ## ⚙️ 常用參數
 
+- `--provider {minimax,elevenlabs}`：選擇目前使用的 TTS provider。
 - `--output-dir <dir>`：輸出到固定目錄。
 - `--force-output-dir`：允許重用非空的 `--output-dir`。
 - `--output-root <dir>`：設定預設輸出根目錄。
 - `--name <label>`：自訂任務資料夾尾碼。
+- `--voice-id <id>`：使用既有的 provider voice ID。
+- `--model <name>` / `--speed <multiplier>`：共通語音控制。
+- `--pitch` / `--language-boost` / `--sample-rate`：僅限 MiniMax 的控制項。
 - `--merge`：全部成功後合併，並刪除分段檔。
 - `--open`：完成後嘗試打開輸出目錄。
 - `--config <path>`：使用指定設定檔。
-- `--request-timeout <seconds>` / `--max-retries <count>`：調整 MiniMax 請求 timeout 與 retry 邊界。
+- `--request-timeout <seconds>` / `--max-retries <count>`：調整 provider 請求 timeout 與 retry 邊界。
 - `--version`：輸出目前 CLI 版本。
 - `doctor`：檢查設定檔、API key 與可選依賴。
 - `config path`：輸出實際設定檔路徑。
@@ -102,6 +115,15 @@ pbpaste | ttsrun --stdin --merge
 - `--json-summary`：以 JSON 輸出最終摘要。
 
 如果指定的 `--output-dir` 已存在且不是空目錄，`ttsrun` 預設會直接停止，避免把兩次執行混在一起。只有在你確定要覆蓋該目錄內產生檔案時，才使用 `--force-output-dir`。
+
+如果你不想每次都帶 `--provider`，可以在設定檔裡指定預設 provider。
+
+目前 ElevenLabs MVP 限制：
+
+- 需自行提供既有 `voice_id`
+- 固定使用 MP3 輸出 profile
+- 僅支援 `--voice-id`、`--model`、`--speed` 這類共通控制
+- `--pitch`、`--language-boost`、`--sample-rate` 這些 MiniMax 專屬參數會直接拒絕
 
 建議優先使用新的管理子命令：
 

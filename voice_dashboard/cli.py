@@ -423,6 +423,11 @@ def run_doctor(config_path: str | None, provider_override: str | None = None) ->
         if resolved_provider == "minimax"
         else "ELEVENLABS_API_KEY"
     )
+    inactive_api_key_label = (
+        "ELEVENLABS_API_KEY"
+        if resolved_provider == "minimax"
+        else "MINIMAX_API_KEY"
+    )
     api_key = os.getenv(api_key_label, "").strip()
     if api_key:
         print_doctor_check("ok", api_key_label, f"set ({len(api_key)} chars)")
@@ -434,6 +439,20 @@ def run_doctor(config_path: str | None, provider_override: str | None = None) ->
         )
         if exit_code == ExitCode.OK:
             exit_code = ExitCode.AUTH
+
+    inactive_api_key = os.getenv(inactive_api_key_label, "").strip()
+    if inactive_api_key:
+        print_doctor_check(
+            "info",
+            inactive_api_key_label,
+            f"set ({len(inactive_api_key)} chars, inactive provider)",
+        )
+    else:
+        print_doctor_check(
+            "info",
+            inactive_api_key_label,
+            "not set (inactive provider)",
+        )
 
     ffmpeg_path = find_ffmpeg_path()
     if ffmpeg_path:

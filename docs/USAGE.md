@@ -2,10 +2,13 @@
 
 This document explains how to use `ttsrun` in this repository for daily batch TTS conversion.
 
+`ttsrun` is a TTS-only CLI. You provide an existing `voice_id` from your provider; the tool does not create, list, or manage voices.
+
 ## 1. Feature Overview
 
 `ttsrun` supports:
 
+- Multiple TTS providers selected by `--provider` or config default
 - Three input sources (choose one):
   - Text file path (positional argument)
   - `--stdin` (standard input)
@@ -25,14 +28,20 @@ This document explains how to use `ttsrun` in this repository for daily batch TT
 ## 2. Prerequisites
 
 - Python 3.10+
-- Environment variable: `MINIMAX_API_KEY`
+- One provider API key, depending on the active provider:
+  - `MINIMAX_API_KEY`
+  - `ELEVENLABS_API_KEY`
 - `ffmpeg` installed if you use `--merge`
 - A supported clipboard command installed if you use `--clipboard`
 
 Set API key (macOS/Linux):
 
 ```bash
+# MiniMax
 export MINIMAX_API_KEY="your_new_key"
+
+# ElevenLabs
+export ELEVENLABS_API_KEY="your_elevenlabs_key"
 ```
 
 > Security note: if an old hardcoded key was exposed before, revoke it and rotate to a new one.
@@ -103,13 +112,19 @@ python3 voice.py --help
 ### 4.1 File input (most stable)
 
 ```bash
-ttsrun examples/sample.txt
+ttsrun --provider minimax --voice-id clone_voice_can examples/sample.txt
 ```
 
 Explicit command form:
 
 ```bash
-ttsrun run examples/sample.txt
+ttsrun run --provider minimax --voice-id clone_voice_can examples/sample.txt
+```
+
+ElevenLabs example:
+
+```bash
+ttsrun --provider elevenlabs --voice-id JBFqnCBsd6RMkjVDRZzb examples/sample.txt
 ```
 
 ### 4.2 Clipboard input (macOS)
@@ -147,7 +162,7 @@ This prints the final manifest summary JSON to stdout. Progress output stays on 
 ttsrun examples/sample.txt --request-timeout 90 --max-retries 5
 ```
 
-- `--request-timeout` controls the HTTP timeout for each MiniMax request attempt.
+- `--request-timeout` controls the HTTP timeout for each provider request attempt.
 - `--max-retries` controls the total number of attempts per segment, including the first request.
 - The same defaults can be persisted in config with `request_timeout_seconds` and `max_retries`.
 
@@ -224,18 +239,24 @@ You can save and customize output in the resolved config path, for example:
 
 ```json
 {
+  "provider": "minimax",
   "defaults": {
     "voice_id": "clone_voice_can",
     "speed": 1.2,
-    "pitch": 0,
-    "language_boost": "Chinese,Yue",
     "model": "speech-2.8-hd",
-    "sample_rate": 32000,
     "format": "mp3",
     "request_timeout_seconds": 60,
     "max_retries": 3,
     "output_root": "~/Documents/voice-dashboard",
     "open_after_finish": false
+  },
+  "providers": {
+    "minimax": {
+      "pitch": 0,
+      "language_boost": "Chinese,Yue",
+      "sample_rate": 32000
+    },
+    "elevenlabs": {}
   }
 }
 ```
@@ -245,6 +266,13 @@ Use a custom config path:
 ```bash
 ttsrun examples/sample.txt --config /path/to/config.json
 ```
+
+### 6.1 Provider Notes
+
+- `ttsrun` is TTS-only. It expects an existing `voice_id`.
+- `--provider minimax` supports MiniMax-specific controls such as `--pitch`, `--language-boost`, and `--sample-rate`.
+- `--provider elevenlabs` currently supports the shared controls only and uses a fixed MP3 output profile for the MVP.
+- MiniMax-only flags are rejected when `--provider elevenlabs` is active.
 
 ## 7. Option Quick Reference
 
@@ -258,15 +286,17 @@ ttsrun examples/sample.txt --config /path/to/config.json
   - `--output-root <dir>`
   - `--name <job-name>`
 - Voice parameters:
+  - `--provider {minimax,elevenlabs}`
   - `--voice-id`
   - `--speed`
-  - `--pitch` (integer)
-  - `--language-boost`
   - `--model`
-  - `--sample-rate`
   - `--format mp3`
   - `--request-timeout <seconds>`
   - `--max-retries <count>`
+- MiniMax-only parameters:
+  - `--pitch` (integer)
+  - `--language-boost`
+  - `--sample-rate`
 - Workflow switches:
   - `--merge`
   - `--open`
@@ -310,6 +340,14 @@ Run a quick environment report:
 ```bash
 ttsrun doctor
 ```
+
+You can check another provider explicitly:
+
+```bash
+ttsrun doctor --provider elevenlabs
+```
+
+`doctor` treats the active provider key as required and reports the inactive provider key as informational only.
 
 ## 10. Output Streams
 

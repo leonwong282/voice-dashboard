@@ -27,12 +27,12 @@ The implementation is done when all of the following are true:
 
 ## 3. Phase 0: Freeze Scope
 
-- [ ] Confirm in code comments and docs that the feature is "multi-provider TTS" rather than "multi-provider voice management".
-- [ ] Keep `voices list`, `voices clone`, and related commands out of the implementation scope.
-- [ ] Avoid adding provider-specific advanced flags unless they are required for the TTS MVP.
-- [ ] Keep first ElevenLabs output support narrow and stable.
+- [x] Confirm in code comments and docs that the feature is "multi-provider TTS" rather than "multi-provider voice management".
+- [x] Keep `voices list`, `voices clone`, and related commands out of the implementation scope.
+- [x] Avoid adding provider-specific advanced flags unless they are required for the TTS MVP.
+- [x] Keep first ElevenLabs output support narrow and stable.
 Acceptance:
-- [ ] No new non-TTS command surface is introduced.
+- [x] No new non-TTS command surface is introduced.
 
 ## 4. Phase 1: Introduce Provider Abstraction Without Behavior Change
 
@@ -104,7 +104,7 @@ Acceptance:
 - [x] For ElevenLabs, read `ELEVENLABS_API_KEY`.
 - [x] Return clear provider-specific auth errors.
 - [x] Update `ttsrun doctor` to validate only the active provider key as required.
-- [ ] Optionally report the inactive provider key as informational only.
+- [x] Optionally report the inactive provider key as informational only.
 
 Acceptance:
 
@@ -230,16 +230,16 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Document `--provider`.
-- [ ] Document config-based default provider.
-- [ ] Document separate env vars for each provider.
-- [ ] Document that the tool remains TTS-only.
-- [ ] Document any provider-specific limitations of the ElevenLabs MVP.
-- [ ] Update examples for both MiniMax and ElevenLabs runs.
+- [x] Document `--provider`.
+- [x] Document config-based default provider.
+- [x] Document separate env vars for each provider.
+- [x] Document that the tool remains TTS-only.
+- [x] Document any provider-specific limitations of the ElevenLabs MVP.
+- [x] Update examples for both MiniMax and ElevenLabs runs.
 
 Acceptance:
 
-- [ ] A new user can determine how to run MiniMax and ElevenLabs from the docs alone.
+- [x] A new user can determine how to run MiniMax and ElevenLabs from the docs alone.
 
 ## 12. Suggested Execution Order For PRs
 

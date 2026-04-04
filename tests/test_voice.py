@@ -251,6 +251,24 @@ class CLITests(unittest.TestCase):
         self.assertIn("elevenlabs", buffer.getvalue())
         self.assertIn("ELEVENLABS_API_KEY", buffer.getvalue())
 
+    def test_doctor_reports_inactive_provider_key_as_info(self):
+        buffer = io.StringIO()
+        with patch.dict(
+            os.environ,
+            {
+                "MINIMAX_API_KEY": "minimax-key",
+                "ELEVENLABS_API_KEY": "elevenlabs-key",
+            },
+            clear=True,
+        ):
+            with redirect_stdout(buffer):
+                exit_code = cli.main(["doctor"])
+
+        self.assertEqual(exit_code, ExitCode.OK)
+        self.assertIn("MINIMAX_API_KEY", buffer.getvalue())
+        self.assertIn("ELEVENLABS_API_KEY", buffer.getvalue())
+        self.assertIn("inactive provider", buffer.getvalue())
+
     def test_invalid_config_returns_config_exit_code(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             input_path = Path(temp_dir) / "input.txt"

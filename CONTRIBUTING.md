@@ -30,6 +30,7 @@ make release-smoke
 The project currently prioritizes:
 
 - stable CLI behavior
+- multi-provider TTS execution with existing `voice_id` inputs
 - packaging and release quality
 - macOS and Linux support
 - predictable automation-friendly output
@@ -44,6 +45,7 @@ Prefer the GitHub bug report template. Good bug reports include:
 - install channel
 - Python version
 - OS
+- active provider and whether `--provider` was set explicitly
 - the exact command used
 - stderr output
 - relevant `manifest.json` or `errors.jsonl` snippets when available
