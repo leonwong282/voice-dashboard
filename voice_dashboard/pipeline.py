@@ -502,7 +502,10 @@ def run_batch_job(
         "input_source": source.kind,
         "input_file": source.input_file,
         "created_at": datetime.now().astimezone().isoformat(),
-        "settings": asdict(settings),
+        "settings": {
+            "provider": provider_name,
+            **asdict(settings),
+        },
         "summary": {
             "total_segments": len(segments),
             "succeeded": success_count,

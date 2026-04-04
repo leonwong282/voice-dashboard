@@ -289,6 +289,28 @@ def resolve_provider(args: argparse.Namespace, config: AppConfig) -> str:
     return args.provider or config.provider or DEFAULT_PROVIDER_NAME
 
 
+def validate_provider_options(
+    parser: argparse.ArgumentParser,
+    args: argparse.Namespace,
+    provider_name: str,
+) -> None:
+    if provider_name != "elevenlabs":
+        return
+
+    invalid_flags: list[str] = []
+    if args.pitch is not None:
+        invalid_flags.append("--pitch")
+    if args.language_boost is not None:
+        invalid_flags.append("--language-boost")
+    if args.sample_rate is not None:
+        invalid_flags.append("--sample-rate")
+
+    if invalid_flags:
+        parser.error(
+            f"{', '.join(invalid_flags)} can only be used with --provider=minimax."
+        )
+
+
 def resolve_settings(args: argparse.Namespace, config: AppConfig) -> TTSSettings:
     return TTSSettings(
         model=args.model or config.model,
@@ -536,6 +558,7 @@ def run_batch_command(
 
     config = load_config(args.config)
     provider_name = resolve_provider(args, config)
+    validate_provider_options(parser, args, provider_name)
     source = resolve_input_source(parser, args)
     settings = resolve_settings(args, config)
     request_settings = resolve_request_settings(args, config)

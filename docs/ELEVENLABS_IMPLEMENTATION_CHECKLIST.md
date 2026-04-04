@@ -151,18 +151,18 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Keep MiniMax-only options explicit:
+- [x] Keep MiniMax-only options explicit:
   - `--pitch`
   - `--language-boost`
   - `--sample-rate`
-- [ ] Reject MiniMax-only options when `--provider elevenlabs` is active.
-- [ ] Avoid exposing new ElevenLabs-only flags unless they are required for the MVP.
-- [ ] If ElevenLabs needs one provider-specific default such as `output_format`, keep it config-backed or internal for the first pass.
+- [x] Reject MiniMax-only options when `--provider elevenlabs` is active.
+- [x] Avoid exposing new ElevenLabs-only flags unless they are required for the MVP.
+- [x] If ElevenLabs needs one provider-specific default such as `output_format`, keep it config-backed or internal for the first pass.
 
 Acceptance:
 
-- [ ] `--pitch` with `--provider elevenlabs` fails fast with a clear input error.
-- [ ] Common options like `--voice-id`, `--model`, and `--speed` work for both providers.
+- [x] `--pitch` with `--provider elevenlabs` fails fast with a clear input error.
+- [x] Common options like `--voice-id`, `--model`, and `--speed` work for both providers.
 
 ## 9. Phase 6: Keep Manifest And Output Stable
 
@@ -172,16 +172,16 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Add `provider` to the persisted settings block.
-- [ ] Preserve existing output directory and merge behavior.
-- [ ] Keep manifest changes additive rather than breaking.
-- [ ] Do not leak secrets into manifest output.
-- [ ] Include provider-specific settings only where they are useful and stable.
+- [x] Add `provider` to the persisted settings block.
+- [x] Preserve existing output directory and merge behavior.
+- [x] Keep manifest changes additive rather than breaking.
+- [x] Do not leak secrets into manifest output.
+- [x] Include provider-specific settings only where they are useful and stable.
 
 Acceptance:
 
-- [ ] Existing automation relying on current output files still works or requires only additive handling.
-- [ ] Manifest output clearly shows which provider generated the audio.
+- [x] Existing automation relying on current output files still works or requires only additive handling.
+- [x] Manifest output clearly shows which provider generated the audio.
 
 ## 10. Phase 7: Test Coverage
 
@@ -209,7 +209,7 @@ Acceptance:
   - success writes binary audio
   - `401` and `403` map to auth failure
   - network errors and `5xx` retry
-- [ ] Add CLI validation tests for provider-specific flag rejection.
+- [x] Add CLI validation tests for provider-specific flag rejection.
 - [x] Add `doctor` tests for provider-aware environment validation.
 
 Acceptance:

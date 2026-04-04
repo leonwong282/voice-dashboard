@@ -288,6 +288,23 @@ class CLITests(unittest.TestCase):
             cli.main(["sample.txt", "--pitch", "0.5"])
         self.assertEqual(context.exception.code, 2)
 
+    def test_elevenlabs_rejects_pitch_flag(self):
+        with self.assertRaises(SystemExit) as context:
+            cli.main(["sample.txt", "--provider", "elevenlabs", "--pitch", "1"])
+        self.assertEqual(context.exception.code, 2)
+
+    def test_elevenlabs_rejects_language_boost_flag(self):
+        with self.assertRaises(SystemExit) as context:
+            cli.main(
+                ["sample.txt", "--provider", "elevenlabs", "--language-boost", "Chinese,Yue"]
+            )
+        self.assertEqual(context.exception.code, 2)
+
+    def test_elevenlabs_rejects_sample_rate_flag(self):
+        with self.assertRaises(SystemExit) as context:
+            cli.main(["sample.txt", "--provider", "elevenlabs", "--sample-rate", "32000"])
+        self.assertEqual(context.exception.code, 2)
+
     def test_wrapper_voice_py_uses_new_cli(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             input_path = Path(temp_dir) / "input.txt"
@@ -764,6 +781,7 @@ class BatchFlowTests(unittest.TestCase):
                 self.assertTrue((output_dir / "0001.mp3").exists())
                 self.assertTrue((output_dir / "0002.mp3").exists())
                 self.assertFalse((output_dir / "merged.mp3").exists())
+                self.assertEqual(manifest["settings"]["provider"], "minimax")
                 self.assertEqual(manifest["summary"]["merge_status"], "skipped")
                 self.assertEqual(manifest["summary"]["cleanup_status"], "skipped")
                 mock_subprocess_run.assert_not_called()
@@ -1187,6 +1205,8 @@ class BatchFlowTests(unittest.TestCase):
                     )
 
             self.assertEqual(exit_code, ExitCode.OK)
+            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["settings"]["provider"], "elevenlabs")
             self.assertEqual(
                 mock_post.call_args.kwargs["json"]["model_id"],
                 "eleven_multilingual_v2",
