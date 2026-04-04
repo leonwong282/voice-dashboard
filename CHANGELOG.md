@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-04-04
+
 ### Added
 - Development guide at `docs/DEVELOPMENT.md` with bootstrap, lint, test, and build commands.
 - GitHub Actions CI workflow for linting, tests, and package build validation.
@@ -37,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation now treats subcommands as the primary management interface while keeping legacy flags as a compatibility layer.
 - Default output paths now follow a more product-like convention under `~/Documents/voice-dashboard` when available.
 - Installation docs now describe the intended `pipx` and PyPI paths for public releases.
+- Release workflow now verifies that the pushed tag version matches `voice_dashboard.__version__` before publishing.
 
 ## [0.1.0] - 2026-04-03
 
@@ -54,5 +57,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `README-old.md`
   - `docs/USAGE-old.md`
 
-[Unreleased]: https://github.com/leonwong282/voice-dashboard/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/leonwong282/voice-dashboard/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.4.2
 [0.1.0]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.1.0

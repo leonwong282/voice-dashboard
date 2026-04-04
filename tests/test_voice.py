@@ -11,6 +11,7 @@ from unittest.mock import patch
 import requests
 
 import voice
+from voice_dashboard import __version__
 from voice_dashboard import cli, pipeline
 from voice_dashboard.errors import ExitCode
 
@@ -52,7 +53,7 @@ class CLITests(unittest.TestCase):
             exit_code = cli.main(["--version"])
 
         self.assertEqual(exit_code, ExitCode.OK)
-        self.assertEqual(buffer.getvalue().strip(), "0.1.0")
+        self.assertEqual(buffer.getvalue().strip(), __version__)
 
     def test_print_config_example(self):
         stdout_buffer = io.StringIO()
