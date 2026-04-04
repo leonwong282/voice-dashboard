@@ -4,23 +4,25 @@ This checklist turns Milestone P3 in `docs/ROADMAP.md` into concrete execution i
 
 ## 1. Test Hardening
 
-- Add subprocess-based CLI integration tests for:
+- Done: add subprocess-based CLI integration tests for:
   - `ttsrun --help`
   - `ttsrun --version`
   - `ttsrun doctor`
   - `ttsrun config path`
-  - `ttsrun run <file>`
+  - `ttsrun config init`
+  - `ttsrun config show`
+  - `ttsrun run <file>` auth failure path
 - Add config edge-case tests for:
-  - invalid JSON config
-  - missing config file
-  - legacy config path fallback
-  - XDG-style config path resolution
+  - Done: invalid JSON config
+  - Done: missing config file
+  - Done: legacy config path fallback
+  - Done: XDG-style config path resolution
 - Add dependency-failure tests for:
-  - missing `ffmpeg`
-  - unsupported clipboard backend
-  - missing `MINIMAX_API_KEY`
-- Add tests for `scripts/verify_public_install.py` retry behavior.
-- Verify CI runs the new integration coverage.
+  - Done: missing `ffmpeg`
+  - Done: unsupported clipboard backend
+  - Done: missing `MINIMAX_API_KEY`
+- Done: add tests for `scripts/verify_public_install.py` retry behavior.
+- Done: CI already runs `pytest -q`, so the new integration coverage is part of the default test pipeline.
 
 ## 2. Operational Hardening
 
