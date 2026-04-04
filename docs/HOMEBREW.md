@@ -43,7 +43,9 @@ Required repository secret:
 - `HOMEBREW_TAP_TOKEN`
   - type: fine-grained GitHub personal access token
   - repository access: `leonwong282/homebrew-tap`
-  - permission: `Contents` set to `Read and write`
+  - minimal permissions:
+    - `Contents`: `Read and write`
+    - `Metadata`: `Read-only`
 
 Release flow:
 
@@ -54,6 +56,14 @@ Release flow:
 5. Push the updated formula into `leonwong282/homebrew-tap`.
 6. Verify `brew install leonwong282/tap/voice-dashboard` on `macos-latest`.
 7. Attach the rendered formula and checksums to the matching GitHub Release.
+
+If the main tag workflow already published to PyPI but failed before updating the tap, run the recovery workflow manually:
+
+```text
+.github/workflows/publish-homebrew.yml
+```
+
+Pass the already-published package version, for example `0.4.3`.
 
 ## 4. Local Formula Testing
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Release and Homebrew maintainer docs now document the minimal fine-grained PAT permissions for `HOMEBREW_TAP_TOKEN`.
+- Release docs now include the `publish-homebrew.yml` recovery path for cases where PyPI publication succeeds before Homebrew publication fails.
+
 ## [0.4.3] - 2026-04-04
 
 ### Added

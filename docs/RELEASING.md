@@ -39,7 +39,9 @@ Create a repository secret in `leonwong282/voice-dashboard`:
 - Name: `HOMEBREW_TAP_TOKEN`
 - Type: fine-grained GitHub personal access token
 - Repository access: `leonwong282/homebrew-tap`
-- Permission: `Contents` set to `Read and write`
+- Minimal permissions:
+  - `Contents`: `Read and write`
+  - `Metadata`: `Read-only` (required by GitHub and added automatically)
 
 Without that secret, tagged releases will still build and publish to PyPI, but the Homebrew publish step will fail.
 
@@ -67,6 +69,14 @@ The release workflow then:
 11. Creates or updates the matching GitHub Release and attaches the built distributions, checksums, and rendered formula.
 
 You can also run the workflow manually with `workflow_dispatch` to rehearse the build and artifact path without creating a published release.
+
+If PyPI publication succeeds but the Homebrew portion fails afterward, use the dedicated recovery workflow instead of cutting a new package version immediately:
+
+```bash
+.github/workflows/publish-homebrew.yml
+```
+
+That workflow renders the formula from the already-published PyPI version, pushes it into `leonwong282/homebrew-tap`, and runs the same macOS Homebrew install smoke check.
 
 ## 5. Post-Release Verification
 
@@ -128,3 +138,10 @@ python scripts/render_homebrew_formula.py --package-version 0.4.0
 ```
 
 The release workflow now also pushes that rendered formula directly into the shared tap, so the GitHub Release attachment is mainly useful for inspection and troubleshooting.
+
+If the tag workflow fails after PyPI publication and the GitHub Release does not exist yet, create the GitHub Release manually from the existing tag and attach:
+
+- the `sdist`
+- the wheel
+- `SHA256SUMS.txt`
+- the rendered `voice-dashboard.rb`
