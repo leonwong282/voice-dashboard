@@ -39,28 +39,29 @@ This checklist turns Milestone P3 in `docs/ROADMAP.md` into concrete execution i
 
 ## 3. Maintainer Docs
 
-- Add `docs/RELEASE_CHECKLIST.md`.
-- Add a compatibility/support policy document.
-- Add maintainer recovery steps for:
+- Done: added `docs/RELEASE_CHECKLIST.md`.
+- Done: added `docs/COMPATIBILITY.md` as the compatibility/support policy.
+- Done: maintainer recovery steps now cover:
   - failed PyPI publish
   - failed Homebrew publish
   - failed GitHub Release creation
-- Cross-link the new docs from `docs/RELEASING.md`.
+- Done: cross-linked the new docs from `docs/RELEASING.md`.
 
 ## 4. Public Maintenance
 
-- Add `.github/ISSUE_TEMPLATE/bug_report.yml`.
-- Add `.github/ISSUE_TEMPLATE/feature_request.yml`.
-- Decide whether to add `CONTRIBUTING.md` or expand `docs/DEVELOPMENT.md`.
-- Clarify supported environments in docs:
+- Done: added `.github/ISSUE_TEMPLATE/bug_report.yml`.
+- Done: added `.github/ISSUE_TEMPLATE/feature_request.yml`.
+- Done: added `.github/ISSUE_TEMPLATE/config.yml` to route support traffic and disable blank issues.
+- Done: added `CONTRIBUTING.md` instead of overloading `docs/DEVELOPMENT.md`.
+- Done: clarified supported environments in docs:
   - Python versions
   - macOS / Linux support
   - external tools such as `ffmpeg`
 
 ## 5. Release Gate For 1.0.0
 
-- CI passes with expanded tests.
-- Release workflow passes without manual recovery.
-- PyPI, `pipx`, and Homebrew install paths are all verified.
-- Maintainer docs cover release, rollback, and recovery.
-- Public support boundary is documented.
+- Done: CI passes with expanded tests.
+- Done: release workflow has already passed without manual recovery after the P2 workflow fixes.
+- Done: PyPI, `pipx`, and Homebrew install paths are all verified.
+- Done: maintainer docs now cover release, rollback, and recovery.
+- Done: public support boundary is documented.

@@ -63,7 +63,7 @@ If the main tag workflow already published to PyPI but failed before updating th
 .github/workflows/publish-homebrew.yml
 ```
 
-Pass the already-published package version, for example `0.4.5`.
+Pass the already-published package version, for example `0.7.0`.
 
 ## 4. Local Formula Testing
 
@@ -73,7 +73,7 @@ Example local workflow:
 
 ```bash
 git clone https://github.com/leonwong282/homebrew-tap /tmp/homebrew-tap
-python scripts/render_homebrew_formula.py --package-version 0.4.5 --output /tmp/homebrew-tap/Formula/voice-dashboard.rb
+python scripts/render_homebrew_formula.py --package-version 0.7.0 --output /tmp/homebrew-tap/Formula/voice-dashboard.rb
 
 export HOMEBREW_NO_AUTO_UPDATE=1
 export HOMEBREW_NO_INSTALL_FROM_API=1
@@ -102,7 +102,7 @@ The repository includes:
 Render a concrete formula from a published package version:
 
 ```bash
-python scripts/render_homebrew_formula.py --package-version 0.4.5
+python scripts/render_homebrew_formula.py --package-version 0.7.0
 ```
 
 If you need to override the source tarball URL manually:

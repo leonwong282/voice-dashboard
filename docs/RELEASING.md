@@ -2,6 +2,12 @@
 
 This guide covers the maintainer workflow for shipping `voice-dashboard` to GitHub Releases, PyPI, and Homebrew.
 
+Maintainer companion docs:
+
+- `docs/RELEASE_CHECKLIST.md`
+- `docs/COMPATIBILITY.md`
+- `CONTRIBUTING.md`
+
 ## 1. Release Preconditions
 
 Before cutting a tag:
@@ -45,13 +51,15 @@ Create a repository secret in `leonwong282/voice-dashboard`:
 
 Without that secret, tagged releases will still build and publish to PyPI, but the Homebrew publish step will fail.
 
+For the exact release-day sequence, use `docs/RELEASE_CHECKLIST.md` as the operational source of truth.
+
 ## 4. Release Workflow
 
 Cut and push a version tag:
 
 ```bash
-git tag v0.4.0
-git push origin v0.4.0
+git tag v0.7.0
+git push origin v0.7.0
 ```
 
 The release workflow then:
@@ -103,7 +111,7 @@ rm -rf /tmp/voice-dashboard-release-check
 For a repeatable scripted check, use:
 
 ```bash
-python scripts/verify_public_install.py --package-spec voice-dashboard==0.4.0
+python scripts/verify_public_install.py --package-spec voice-dashboard==0.7.0
 ```
 
 The same verification now runs automatically in the tag-driven release workflow after PyPI publication succeeds.
@@ -134,7 +142,7 @@ make dist-sha256
 To render a concrete formula body from the published source tarball:
 
 ```bash
-python scripts/render_homebrew_formula.py --package-version 0.4.0
+python scripts/render_homebrew_formula.py --package-version 0.7.0
 ```
 
 The release workflow now also pushes that rendered formula directly into the shared tap, so the GitHub Release attachment is mainly useful for inspection and troubleshooting.
@@ -145,3 +153,9 @@ If the tag workflow fails after PyPI publication and the GitHub Release does not
 - the wheel
 - `SHA256SUMS.txt`
 - the rendered `voice-dashboard.rb`
+
+See also:
+
+- `docs/RELEASE_CHECKLIST.md` for the step-by-step release and recovery checklist
+- `docs/COMPATIBILITY.md` for the supported Python, platform, and install boundary
+- `CONTRIBUTING.md` for contributor and triage expectations

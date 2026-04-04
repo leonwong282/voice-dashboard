@@ -6,7 +6,7 @@
 
 > 日常可用的 MiniMax 批量文字轉語音（TTS）命令列工具。
 
-![Version](https://img.shields.io/badge/Version-0.4.5-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.7.0-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL--3.0-red?style=for-the-badge)
 ![CLI](https://img.shields.io/badge/CLI-ttsrun-green?style=for-the-badge)
@@ -118,8 +118,11 @@ ttsrun config init
 
 - 完整使用說明（英文）：[docs/USAGE.md](docs/USAGE.md)
 - 開發指南（英文）：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- 參與貢獻指南（英文）：[CONTRIBUTING.md](CONTRIBUTING.md)
 - Homebrew 指南（英文）：[docs/HOMEBREW.md](docs/HOMEBREW.md)
 - 發布指南（英文）：[docs/RELEASING.md](docs/RELEASING.md)
+- 發布 checklist（英文）：[docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)
+- 相容性與支援邊界（英文）：[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)
 - 產品化路線圖：[docs/ROADMAP.md](docs/ROADMAP.md)
 
 <p align="right">(<a href="#readme-top">回到頂部</a>)</p>

@@ -1,0 +1,74 @@
+name: Bug Report
+description: Report a reproducible bug in voice-dashboard.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please include enough detail to reproduce the issue on a clean machine.
+  - type: input
+    id: version
+    attributes:
+      label: Installed Version
+      description: Output from `ttsrun --version`
+      placeholder: "0.7.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install_channel
+    attributes:
+      label: Install Channel
+      description: How was voice-dashboard installed?
+      options:
+        - pipx
+        - pip
+        - Homebrew
+        - source checkout
+    validations:
+      required: true
+  - type: input
+    id: python_version
+    attributes:
+      label: Python Version
+      placeholder: "3.12.2"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      placeholder: "macOS 15.4 / Ubuntu 24.04"
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: Paste the exact command that failed.
+      placeholder: |
+        ttsrun examples/sample.txt --merge
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: Include stderr output and any relevant manifest or errors snippets.
+    validations:
+      required: true
+  - type: checkboxes
+    id: environment
+    attributes:
+      label: Environment Details
+      options:
+        - label: I have included whether `ffmpeg` is involved.
+        - label: I have included whether clipboard input is involved.
+        - label: I have included any relevant config-file details.

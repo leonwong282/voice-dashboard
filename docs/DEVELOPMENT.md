@@ -37,7 +37,7 @@ make smoke
 make build
 make dist-sha256
 make homebrew-formula SOURCE_URL=... SOURCE_SHA256=...
-make public-install-smoke PACKAGE_SPEC=voice-dashboard==0.4.0
+make public-install-smoke PACKAGE_SPEC=voice-dashboard==0.7.0
 make release-smoke
 ```
 
@@ -91,3 +91,5 @@ The CI workflow validates three things on every change:
 Any local change should pass the same checks before release work begins.
 
 For maintainer release steps, see `docs/RELEASING.md`.
+
+For contributor scope and validation expectations, see `CONTRIBUTING.md`.

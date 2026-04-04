@@ -196,7 +196,7 @@ Suggested release label:
 
 ### Milestone P3: Reliability, Supportability, And v1.0 Readiness
 
-Status: in progress on 2026-04-04.
+Status: completed on 2026-04-04.
 
 Target outcome: the project is credible as a maintained CLI product.
 
@@ -224,6 +224,14 @@ Acceptance criteria:
 - Maintainers can release confidently from a written checklist.
 - Users can install and use the tool through documented channels without guessing.
 - The project has a clear support boundary and stable public interface.
+
+Progress notes:
+
+- P3.1 is complete: subprocess-based installed-CLI integration tests now cover the main command surface and failure paths.
+- P3.2 is complete: request timeout/retry settings, output-directory overwrite rules, and merge-cleanup safety are now explicit, documented, and tested.
+- P3.3 is complete: maintainer docs now include a release checklist, compatibility/support policy, and contributor-facing maintenance guidance.
+- P3.4 is complete: GitHub issue templates, contact routing, and the public support boundary are now documented.
+- The local release gate now passes through `make check release-smoke`, and the published PyPI/Homebrew install paths have already been verified in the tag-driven workflow.
 
 Execution plan:
 
@@ -332,10 +340,10 @@ The following items may be valuable, but they should not block productization:
 
 The highest-value next moves are:
 
-1. Add subprocess-driven CLI integration tests under `tests/`.
-2. Add a maintainer release checklist document under `docs/`.
-3. Review `pipeline.py` for timeout, retry, and cleanup edge cases before changing user-facing behavior further.
-4. Add GitHub issue templates so incoming bug reports become reproducible.
+1. Decide whether to ship one more `0.7.x` stabilization release or promote directly toward `1.0.0`.
+2. Review any remaining undocumented edge cases in the manifest/output contract before freezing the `1.0.0` public interface.
+3. Keep `docs/COMPATIBILITY.md` aligned with CI if Python-version or platform support expands.
+4. Treat any new user-facing behavior changes as `1.0.0` scope decisions rather than packaging work.
 
 ## 10. Success Metrics
 

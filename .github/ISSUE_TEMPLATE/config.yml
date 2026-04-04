@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Usage Guide
+    url: https://github.com/leonwong282/voice-dashboard/blob/main/docs/USAGE.md
+    about: Read the CLI usage guide before opening a support issue.
+  - name: Compatibility And Support Policy
+    url: https://github.com/leonwong282/voice-dashboard/blob/main/docs/COMPATIBILITY.md
+    about: Check the supported Python, platform, and install boundary.
+  - name: GitHub Discussions
+    url: https://github.com/leonwong282/voice-dashboard/discussions
+    about: Use Discussions for general questions, workflow ideas, or open-ended support.

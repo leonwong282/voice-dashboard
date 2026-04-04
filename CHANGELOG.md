@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-04
+
+### Added
+- Subprocess-based installed-CLI integration tests covering the main `ttsrun` command surface and key failure paths.
+- Direct regression tests for `scripts/verify_public_install.py` retry behavior.
+- Maintainer-facing release checklist at `docs/RELEASE_CHECKLIST.md`.
+- Compatibility and support policy at `docs/COMPATIBILITY.md`.
+- Contributor guidance at `CONTRIBUTING.md`.
+- GitHub issue templates for bug reports and feature requests, plus issue-template routing in `.github/ISSUE_TEMPLATE/config.yml`.
+
+### Changed
+- Request timeout and retry boundaries are now explicit through `--request-timeout`, `--max-retries`, `request_timeout_seconds`, and `max_retries`.
+- Explicit non-empty `--output-dir` paths now fail fast unless `--force-output-dir` is provided.
+- Merge cleanup now preserves successful segment artifacts safely by restoring them in place or preserving a cleanup backup directory when cleanup cannot complete.
+- Usage, development, release, and roadmap docs now reflect the completed P3 reliability and supportability work.
+
 ## [0.4.5] - 2026-04-04
 
 ### Changed
@@ -82,7 +98,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `README-old.md`
   - `docs/USAGE-old.md`
 
-[Unreleased]: https://github.com/leonwong282/voice-dashboard/compare/v0.4.5...HEAD
+[Unreleased]: https://github.com/leonwong282/voice-dashboard/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.7.0
 [0.4.5]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.4.5
 [0.4.4]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.4.4
 [0.4.3]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.4.3

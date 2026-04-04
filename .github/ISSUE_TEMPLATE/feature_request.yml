@@ -1,0 +1,47 @@
+name: Feature Request
+description: Propose a user-facing improvement for voice-dashboard.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the problem first, then the proposed change. Requests that include a concrete workflow are easier to evaluate.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem To Solve
+      description: What limitation or friction are you hitting today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Change
+      description: Describe the behavior you want.
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Example Workflow
+      description: Show the command or automation workflow that would benefit from this change.
+      placeholder: |
+        ttsrun examples/sample.txt --json-summary
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Current Workaround
+      description: Leave blank if there is no workaround.
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: Impact Area
+      options:
+        - label: CLI UX
+        - label: Packaging or install path
+        - label: Automation or machine-readable output
+        - label: Documentation

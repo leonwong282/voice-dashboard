@@ -6,7 +6,7 @@
 
 > A practical MiniMax batch Text-to-Speech CLI for daily workflows.
 
-![Version](https://img.shields.io/badge/Version-0.4.5-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.7.0-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL--3.0-red?style=for-the-badge)
 ![CLI](https://img.shields.io/badge/CLI-ttsrun-green?style=for-the-badge)
@@ -118,8 +118,11 @@ ttsrun config init
 
 - Full usage guide: [docs/USAGE.md](docs/USAGE.md)
 - Development guide: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Homebrew guide: [docs/HOMEBREW.md](docs/HOMEBREW.md)
 - Release guide: [docs/RELEASING.md](docs/RELEASING.md)
+- Release checklist: [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)
+- Compatibility and support policy: [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)
 - Product roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
