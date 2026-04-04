@@ -1,87 +1,101 @@
 # Homebrew Packaging Guide
 
-This document covers the planned Homebrew distribution path for `voice-dashboard`.
+This document covers the published Homebrew distribution path for `voice-dashboard`.
 
 ## 1. Current Status
 
-Homebrew support is not published yet. The repository now includes:
-
-- a release workflow that creates tagged source and wheel artifacts
-- a Homebrew formula template under `packaging/homebrew/`
-- maintainer guidance for turning a tagged release into a tap formula
-
-The actual tap repository should be created only after the PyPI release path is stable.
-
-## 2. Recommended Tap Layout
-
-Use a dedicated tap repository such as:
+`voice-dashboard` is now published through the shared tap:
 
 ```text
-leonwong282/homebrew-voice-dashboard
+leonwong282/homebrew-tap
 ```
 
-The formula file should live at:
+End users install it with:
+
+```bash
+brew install leonwong282/tap/voice-dashboard
+```
+
+The main release workflow renders a formula from the published PyPI sdist metadata, pushes that formula into the tap repository, and then verifies a real Homebrew install on `macos-latest`.
+
+## 2. Tap Layout
+
+The shared tap repository lives at:
+
+```text
+https://github.com/leonwong282/homebrew-tap
+```
+
+The formula file path is:
 
 ```text
 Formula/voice-dashboard.rb
 ```
 
-End users would then install with:
+This shared tap layout is the intended structure for future CLI tools as well.
+
+## 3. Release Automation
+
+The tag-driven `release.yml` workflow now handles Homebrew publication automatically after PyPI publication succeeds.
+
+Required repository secret:
+
+- `HOMEBREW_TAP_TOKEN`
+  - type: fine-grained GitHub personal access token
+  - repository access: `leonwong282/homebrew-tap`
+  - permission: `Contents` set to `Read and write`
+
+Release flow:
+
+1. Build and validate `sdist` and `wheel`.
+2. Publish to PyPI through Trusted Publishing.
+3. Verify public `pip` and `pipx` installation paths.
+4. Render `Formula/voice-dashboard.rb` from published PyPI metadata.
+5. Push the updated formula into `leonwong282/homebrew-tap`.
+6. Verify `brew install leonwong282/tap/voice-dashboard` on `macos-latest`.
+7. Attach the rendered formula and checksums to the matching GitHub Release.
+
+## 4. Local Formula Testing
+
+Recent Homebrew versions reject direct `brew install /path/to/formula.rb` for tap-managed formulae. Test through a local tap checkout instead.
+
+Example local workflow:
 
 ```bash
-brew install leonwong282/voice-dashboard/voice-dashboard
-```
+git clone https://github.com/leonwong282/homebrew-tap /tmp/homebrew-tap
+python scripts/render_homebrew_formula.py --package-version 0.4.3 --output /tmp/homebrew-tap/Formula/voice-dashboard.rb
 
-## 3. Formula Workflow
-
-Homebrew’s official guidance for Python applications is to package them as applications, declare a brewed Python dependency, and vendor Python module dependencies as `resource` stanzas.
-
-Suggested workflow for each release:
-
-1. Cut and publish the GitHub release tag first.
-2. Use the release source tarball URL in the formula.
-3. Start from `packaging/homebrew/voice-dashboard.rb.template`.
-4. Fill in the version, tarball URL, and SHA256.
-5. Generate or refresh Python `resource` stanzas with Homebrew tooling.
-6. Test the formula locally before pushing the tap update.
-
-Useful commands:
-
-```bash
-make dist-sha256
-brew create --python --set-name voice-dashboard <source-tarball-url>
-brew update-python-resources --print-only Formula/voice-dashboard.rb
-HOMEBREW_NO_INSTALL_FROM_API=1 brew install --build-from-source Formula/voice-dashboard.rb
-brew audit --strict --formula Formula/voice-dashboard.rb
-brew test voice-dashboard
-```
-
-## 4. Local Testing Notes
-
-When iterating on a local formula checkout, force Homebrew to use the local tap checkout instead of the API:
-
-```bash
+export HOMEBREW_NO_AUTO_UPDATE=1
 export HOMEBREW_NO_INSTALL_FROM_API=1
+
+brew untap leonwong282/tap || true
+brew tap leonwong282/tap /tmp/homebrew-tap
+brew audit --strict leonwong282/tap/voice-dashboard
+brew install leonwong282/tap/voice-dashboard
+brew test leonwong282/tap/voice-dashboard
 ```
 
-This matters when testing unpublished formula changes from a tap repository.
+If you want to clean up afterwards:
 
-## 5. Template Files
+```bash
+brew uninstall voice-dashboard || true
+brew untap leonwong282/tap
+```
+
+## 5. Formula Inputs
 
 The repository includes:
 
 - `packaging/homebrew/voice-dashboard.rb.template`
 - `scripts/render_homebrew_formula.py`
 
-That template is intentionally not a live formula yet. It exists to keep release-time edits small and repeatable.
-
-You can render a concrete formula directly from the published PyPI release metadata with:
+Render a concrete formula from a published package version:
 
 ```bash
-python scripts/render_homebrew_formula.py --package-version 0.4.0
+python scripts/render_homebrew_formula.py --package-version 0.4.3
 ```
 
-If you need to override the source tarball URL manually, the script also accepts:
+If you need to override the source tarball URL manually:
 
 ```bash
 python scripts/render_homebrew_formula.py \

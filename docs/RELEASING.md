@@ -1,6 +1,6 @@
 # Release Guide
 
-This guide covers the maintainer workflow for shipping `voice-dashboard` to GitHub Releases and PyPI.
+This guide covers the maintainer workflow for shipping `voice-dashboard` to GitHub Releases, PyPI, and Homebrew.
 
 ## 1. Release Preconditions
 
@@ -28,7 +28,22 @@ Create or update the PyPI project, then register this trusted publisher:
 
 The `pypi` GitHub environment is intentionally part of the trust boundary. Keep any environment protection rules aligned with your release policy.
 
-## 3. Release Workflow
+## 3. Homebrew Tap Automation Setup
+
+This repository now publishes the Homebrew formula automatically into:
+
+- `leonwong282/homebrew-tap`
+
+Create a repository secret in `leonwong282/voice-dashboard`:
+
+- Name: `HOMEBREW_TAP_TOKEN`
+- Type: fine-grained GitHub personal access token
+- Repository access: `leonwong282/homebrew-tap`
+- Permission: `Contents` set to `Read and write`
+
+Without that secret, tagged releases will still build and publish to PyPI, but the Homebrew publish step will fail.
+
+## 4. Release Workflow
 
 Cut and push a version tag:
 
@@ -47,11 +62,13 @@ The release workflow then:
 6. Publishes the same distributions to PyPI through Trusted Publishing.
 7. Verifies `voice-dashboard==<tag-version>` through real `pip` and `pipx` installs from PyPI.
 8. Renders a Homebrew formula asset for the same tag using the published PyPI sdist metadata.
-9. Creates or updates the matching GitHub Release and attaches the built distributions, checksums, and rendered formula.
+9. Pushes the rendered formula into `leonwong282/homebrew-tap`.
+10. Verifies `brew install leonwong282/tap/voice-dashboard` on `macos-latest`.
+11. Creates or updates the matching GitHub Release and attaches the built distributions, checksums, and rendered formula.
 
 You can also run the workflow manually with `workflow_dispatch` to rehearse the build and artifact path without creating a published release.
 
-## 4. Post-Release Verification
+## 5. Post-Release Verification
 
 After PyPI publication completes, verify the public install path in a clean shell:
 
@@ -81,11 +98,22 @@ python scripts/verify_public_install.py --package-spec voice-dashboard==0.4.0
 
 The same verification now runs automatically in the tag-driven release workflow after PyPI publication succeeds.
 
-## 5. Homebrew Follow-Up
+Verify the published Homebrew route as well:
 
-Homebrew support should be added only after the PyPI release path is stable. Once the first public PyPI release is verified, use the GitHub Release artifacts from the matching tag as the input for a tap formula.
+```bash
+brew tap leonwong282/tap
+brew install leonwong282/tap/voice-dashboard
+ttsrun --version
+brew test leonwong282/tap/voice-dashboard
+```
 
-The repository includes a starting point at `packaging/homebrew/voice-dashboard.rb.template` plus a dedicated guide in `docs/HOMEBREW.md`.
+## 6. Homebrew Notes
+
+The repository still includes the template and rendering path used by the automation:
+
+- `packaging/homebrew/voice-dashboard.rb.template`
+- `scripts/render_homebrew_formula.py`
+- `docs/HOMEBREW.md`
 
 To prepare the source tarball checksum for a formula update:
 
@@ -99,4 +127,4 @@ To render a concrete formula body from the published source tarball:
 python scripts/render_homebrew_formula.py --package-version 0.4.0
 ```
 
-The release workflow now attaches the rendered `voice-dashboard.rb` file to the matching GitHub Release so the tap update can start from a concrete artifact instead of a manual copy step.
+The release workflow now also pushes that rendered formula directly into the shared tap, so the GitHub Release attachment is mainly useful for inspection and troubleshooting.

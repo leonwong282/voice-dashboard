@@ -52,7 +52,13 @@ If you want the package inside an existing Python environment instead:
 python3 -m pip install voice-dashboard
 ```
 
-Homebrew support is planned but not published yet. See `docs/HOMEBREW.md` for the tap and formula workflow that will be used once public releases are stable.
+Homebrew install is also available:
+
+```bash
+brew install leonwong282/tap/voice-dashboard
+```
+
+See `docs/HOMEBREW.md` for the tap and release automation details.
 
 ### 3.2 Local install from source
 

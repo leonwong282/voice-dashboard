@@ -6,7 +6,7 @@
 
 > 日常可用的 MiniMax 批量文字轉語音（TTS）命令列工具。
 
-![Version](https://img.shields.io/badge/Version-0.4.2-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.4.3-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL--3.0-red?style=for-the-badge)
 ![CLI](https://img.shields.io/badge/CLI-ttsrun-green?style=for-the-badge)
@@ -61,7 +61,11 @@ pipx install voice-dashboard
 python3 -m pip install voice-dashboard
 ```
 
-Homebrew 安裝通道已規劃，但尚未正式發布；預計做法記錄在 `docs/HOMEBREW.md`。
+Homebrew 也已提供安裝：
+
+```bash
+brew install leonwong282/tap/voice-dashboard
+```
 
 如果是要參與開發，請改看開發指南並使用 editable install。
 

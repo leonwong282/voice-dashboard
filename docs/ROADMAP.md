@@ -150,7 +150,7 @@ Suggested release label:
 
 ### Milestone P2: Distribution And Install Channels
 
-Status: in progress as of 2026-04-03.
+Status: completed on 2026-04-04.
 
 Target outcome: end users can install the tool without cloning the repository.
 
@@ -186,6 +186,9 @@ Progress notes:
 - A Homebrew formula renderer now converts the repository template plus resolved Python resources into a concrete formula body.
 - The main release workflow now includes post-publish install verification from PyPI and publishes a rendered Homebrew formula artifact alongside the release assets.
 - The release workflow now also publishes artifact checksums and renders the Homebrew formula from the published PyPI release metadata.
+- A shared tap repository now exists at `leonwong282/homebrew-tap`.
+- Tagged releases now push `Formula/voice-dashboard.rb` into the shared tap automatically when `HOMEBREW_TAP_TOKEN` is configured.
+- The release workflow now verifies a real `brew install leonwong282/tap/voice-dashboard` on `macos-latest` before considering the release complete.
 
 Suggested release label:
 
@@ -257,11 +260,10 @@ The following items may be valuable, but they should not block productization:
 
 The highest-value next moves are:
 
-1. Register the PyPI trusted publisher and cut the first tagged release to validate the real publish path.
-2. Verify `pipx install voice-dashboard` against the published package instead of only local wheels.
-3. Define the initial Homebrew tap and formula strategy after the PyPI release path is stable.
-4. Add post-publish smoke checks or a reusable checklist for public installation verification.
-5. Keep Homebrew work separate from PyPI release stabilization.
+1. Expand CLI and integration-style test coverage around real config files, failure modes, and packaging boundaries.
+2. Write a maintainer release checklist that covers recovery paths, rollback expectations, and support boundaries.
+3. Tighten documentation for supported platforms, environment assumptions, and operational limits.
+4. Review contribution and issue-management docs for a broader public maintenance model.
 
 ## 10. Success Metrics
 

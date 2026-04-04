@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-04-04
+
+### Added
+- Automated Homebrew tap publishing from the tag-driven release workflow, targeting `leonwong282/homebrew-tap`.
+- A macOS Homebrew install smoke step in the release workflow to verify `brew install leonwong282/tap/voice-dashboard`.
+
+### Changed
+- Homebrew documentation and install docs now describe the published shared tap instead of a future/manual tap process.
+
 ## [0.4.2] - 2026-04-04
 
 ### Added
@@ -57,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `README-old.md`
   - `docs/USAGE-old.md`
 
-[Unreleased]: https://github.com/leonwong282/voice-dashboard/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/leonwong282/voice-dashboard/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.4.3
 [0.4.2]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.4.2
 [0.1.0]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.1.0

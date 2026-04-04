@@ -6,7 +6,7 @@
 
 > A practical MiniMax batch Text-to-Speech CLI for daily workflows.
 
-![Version](https://img.shields.io/badge/Version-0.4.2-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.4.3-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL--3.0-red?style=for-the-badge)
 ![CLI](https://img.shields.io/badge/CLI-ttsrun-green?style=for-the-badge)
@@ -61,7 +61,11 @@ If you explicitly want the package in an existing Python environment:
 python3 -m pip install voice-dashboard
 ```
 
-Homebrew support is planned but not published yet. The intended path is documented in `docs/HOMEBREW.md`.
+Homebrew install is also available:
+
+```bash
+brew install leonwong282/tap/voice-dashboard
+```
 
 For contributor setup, use the development guide and editable install instead.
 
