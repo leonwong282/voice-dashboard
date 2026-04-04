@@ -9,9 +9,13 @@ This document explains how to use `ttsrun` in this repository for daily batch TT
 - Three input sources (choose one):
   - Text file path (positional argument)
   - `--stdin` (standard input)
-  - `--clipboard` (macOS `pbpaste`)
+  - `--clipboard` (supported clipboard commands such as `pbpaste`, `wl-paste`, `xclip`, or `xsel`)
 - Plain-text splitting by empty lines (one MP3 per segment)
 - Optional merge via `--merge` (default is **no merge**)
+- Output control for scripting:
+  - `--quiet`
+  - `--verbose`
+  - `--json-summary`
 - Output artifacts: `manifest.json` and `errors.jsonl`
 - Config file support for persistent defaults
 
@@ -20,7 +24,7 @@ This document explains how to use `ttsrun` in this repository for daily batch TT
 - Python 3.10+
 - Environment variable: `MINIMAX_API_KEY`
 - `ffmpeg` installed if you use `--merge`
-- macOS `pbpaste` available if you use `--clipboard`
+- A supported clipboard command installed if you use `--clipboard`
 
 Set API key (macOS/Linux):
 
@@ -34,23 +38,50 @@ export MINIMAX_API_KEY="your_new_key"
 
 The project exposes a `console_scripts` command named `ttsrun`.
 
-### 3.1 Editable install (recommended)
+### 3.1 Published install from PyPI
+
+Once a public PyPI release exists, prefer `pipx` for end-user CLI installation:
+
+```bash
+pipx install voice-dashboard
+```
+
+If you want the package inside an existing Python environment instead:
+
+```bash
+python3 -m pip install voice-dashboard
+```
+
+Homebrew support is planned but not published yet. See `docs/HOMEBREW.md` for the tap and formula workflow that will be used once public releases are stable.
+
+### 3.2 Local install from source
 
 Run at repository root:
 
 ```bash
-python3 -m pip install -e .
+python3 -m pip install .
 ```
 
 Then verify:
 
 ```bash
 ttsrun --help
+ttsrun doctor
 ```
 
-### 3.2 Direct script entrypoint
+### 3.3 Editable install for contributors
 
-If you do not want a global command yet:
+If you are working on the project itself:
+
+```bash
+python3 -m pip install -e ".[dev]"
+```
+
+See `docs/DEVELOPMENT.md` for the full contributor workflow.
+
+### 3.4 Direct script entrypoint
+
+If you do not want an installed command yet:
 
 ```bash
 python3 voice.py --help
@@ -64,6 +95,12 @@ python3 voice.py --help
 
 ```bash
 ttsrun examples/sample.txt
+```
+
+Explicit command form:
+
+```bash
+ttsrun run examples/sample.txt
 ```
 
 ### 4.2 Clipboard input (macOS)
@@ -87,6 +124,14 @@ ttsrun examples/sample.txt --merge
 - Without `--merge`: keeps `0001.mp3`, `0002.mp3`, ...
 - With `--merge`: generates `merged.mp3` after all segments succeed, then removes segment files from this run
 
+### 4.5 Machine-readable summary
+
+```bash
+ttsrun examples/sample.txt --json-summary
+```
+
+This prints the final manifest summary JSON to stdout. Progress output stays on stderr so the JSON can be piped safely.
+
 ## 5. Output Rules
 
 ### 5.1 Default output directory
@@ -98,7 +143,7 @@ If `--output-dir` is not provided, the tool creates:
 ```
 
 Where:
-- `output_root` comes from config (default: `~/Documents/tts-output`)
+- `output_root` comes from config (default: `~/Documents/voice-dashboard` when `~/Documents` exists, otherwise an XDG-style data directory)
 - `label` is derived from the input source (or overridden by `--name`)
 
 ### 5.2 Fixed output directory
@@ -120,16 +165,36 @@ Each run generates at least:
 Default config path:
 
 ```text
-~/.voice-dashboard.json
+~/.config/voice-dashboard/config.json
 ```
+
+If you already have the legacy file `~/.voice-dashboard.json`, `ttsrun` keeps using it until you move or replace it.
 
 Print a config example:
 
 ```bash
-ttsrun --print-config-example
+ttsrun config example
 ```
 
-You can save and customize output as `~/.voice-dashboard.json`, for example:
+Print the resolved config path:
+
+```bash
+ttsrun config path
+```
+
+Create an example config file:
+
+```bash
+ttsrun config init
+```
+
+Show the effective configuration, including resolved metadata:
+
+```bash
+ttsrun config show
+```
+
+You can save and customize output in the resolved config path, for example:
 
 ```json
 {
@@ -141,7 +206,7 @@ You can save and customize output as `~/.voice-dashboard.json`, for example:
     "model": "speech-2.8-hd",
     "sample_rate": 32000,
     "format": "mp3",
-    "output_root": "~/Documents/tts-output",
+    "output_root": "~/Documents/voice-dashboard",
     "open_after_finish": false
   }
 }
@@ -174,15 +239,59 @@ ttsrun examples/sample.txt --config /path/to/config.json
 - Workflow switches:
   - `--merge`
   - `--open`
+  - `--quiet`
+  - `--verbose`
+  - `--json-summary`
+- Management commands:
+  - `--version`
+  - `doctor`
+  - `config path`
+  - `config show`
+  - `config example`
+  - `config init`
+- Deprecated compatibility flags:
+  - `--doctor`
+  - `--print-config-path`
+  - `--print-config-example`
+  - `--init-config`
+  - `--force` (with `--init-config`)
 
 ## 8. Failure Handling and Exit Codes
 
-- If any segment fails, process exits with non-zero status, while successful segments are kept.
+- Stable exit codes:
+  - `0`: success
+  - `2`: command-line usage error from `argparse`
+  - `3`: config error
+  - `4`: input source error
+  - `5`: authentication error
+  - `6`: API or network error
+  - `7`: dependency error
+- If any segment fails, process exits with a category-specific non-zero status, while successful segments are kept.
 - In `--merge` mode:
   - Missing `ffmpeg`, merge failure, or cleanup failure leads to non-zero exit.
   - On merge failure, segment files are preserved for troubleshooting.
 
-## 9. Recommended Daily Commands
+## 9. Environment Checks
+
+Run a quick environment report:
+
+```bash
+ttsrun doctor
+```
+
+## 10. Output Streams
+
+- stdout is used for explicit command output such as:
+  - `--version`
+  - `ttsrun config path`
+  - `ttsrun config example`
+  - `ttsrun config show`
+  - `--json-summary`
+- stderr is used for progress lines, warnings, and errors during batch execution.
+- `--quiet` suppresses progress output while still allowing warnings and errors.
+- `--verbose` adds extra detail such as resolved settings and retry notices.
+
+## 11. Recommended Daily Commands
 
 If your workflow is "copy text → generate audio":
 

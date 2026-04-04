@@ -23,8 +23,12 @@
 - Three input sources (choose one):
   - File path: `ttsrun <file.txt>`
   - Standard input: `ttsrun --stdin`
-  - Clipboard on macOS: `ttsrun --clipboard`
+  - Clipboard on supported systems: `ttsrun --clipboard`
 - Optional merge: only merges when `--merge` is provided.
+- Output control for automation and scripting:
+  - `--quiet`
+  - `--verbose`
+  - `--json-summary`
 - Output artifacts for traceability:
   - `manifest.json`
   - `errors.jsonl`
@@ -37,11 +41,29 @@
 export MINIMAX_API_KEY="your_new_key"
 ```
 
-### 2) Install (editable mode)
+### 2) Install
+
+For regular local use from source:
 
 ```bash
-python3 -m pip install -e .
+python3 -m pip install .
 ```
+
+Once the package is published to PyPI, prefer `pipx` for CLI-style installation:
+
+```bash
+pipx install voice-dashboard
+```
+
+If you explicitly want the package in an existing Python environment:
+
+```bash
+python3 -m pip install voice-dashboard
+```
+
+Homebrew support is planned but not published yet. The intended path is documented in `docs/HOMEBREW.md`.
+
+For contributor setup, use the development guide and editable install instead.
 
 ### 3) Run
 
@@ -64,11 +86,33 @@ pbpaste | ttsrun --stdin --merge
 - `--merge`: merge all successful segments and remove segment files.
 - `--open`: open output directory after completion.
 - `--config <path>`: use a specific config file.
-- `--print-config-example`: print a sample config JSON.
+- `--version`: print the installed CLI version.
+- `doctor`: inspect config, API key, and optional dependencies.
+- `config path`: print the resolved config path.
+- `config show`: print the effective config as JSON.
+- `config example`: print a sample config JSON.
+- `config init`: write an example config file.
+- `--quiet` / `--verbose`: control progress output on stderr.
+- `--json-summary`: print the final manifest summary as JSON.
+
+Preferred management commands:
+
+```bash
+ttsrun doctor
+ttsrun config path
+ttsrun config show
+ttsrun config init
+```
+
+`ttsrun run <input_path>` is also supported as an explicit batch subcommand. The older management flags remain available as a deprecated compatibility layer.
 
 ## 📖 Documentation
 
 - Full usage guide: [docs/USAGE.md](docs/USAGE.md)
+- Development guide: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- Homebrew guide: [docs/HOMEBREW.md](docs/HOMEBREW.md)
+- Release guide: [docs/RELEASING.md](docs/RELEASING.md)
+- Product roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
