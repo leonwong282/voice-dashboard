@@ -165,17 +165,17 @@ def add_run_options(parser: argparse.ArgumentParser) -> None:
         help="Voice pitch adjustment. MiniMax expects an integer.",
     )
     parser.add_argument("--language-boost", help="language_boost payload value.")
-    parser.add_argument("--model", help="MiniMax model name.")
+    parser.add_argument("--model", help="Model name for the active provider.")
     parser.add_argument("--sample-rate", type=int, help="Output audio sample rate.")
     parser.add_argument(
         "--request-timeout",
         type=parse_positive_int,
-        help="HTTP request timeout in seconds for each MiniMax attempt.",
+        help="HTTP request timeout in seconds for each provider attempt.",
     )
     parser.add_argument(
         "--max-retries",
         type=parse_positive_int,
-        help="Maximum MiniMax request attempts per segment, including the first attempt.",
+        help="Maximum provider request attempts per segment, including the first attempt.",
     )
     parser.add_argument(
         "--format",
