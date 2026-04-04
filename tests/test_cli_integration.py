@@ -129,36 +129,61 @@ class InstalledCLITests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             home_dir = Path(temp_dir) / "home"
             home_dir.mkdir()
+            xdg_config_home = Path(temp_dir) / "xdg-config"
 
-            result = self.run_ttsrun("config", "path", env_overrides={"HOME": str(home_dir)})
+            result = self.run_ttsrun(
+                "config",
+                "path",
+                env_overrides={
+                    "HOME": str(home_dir),
+                    "XDG_CONFIG_HOME": str(xdg_config_home),
+                },
+            )
 
         self.assertEqual(result.returncode, ExitCode.OK, result.stderr)
         self.assertEqual(
             result.stdout.strip(),
-            str(home_dir / ".config" / "voice-dashboard" / "config.json"),
+            str(xdg_config_home / "voice-dashboard" / "config.json"),
         )
 
-    def test_installed_config_show_reports_legacy_path_metadata(self):
+    def test_installed_config_show_accepts_explicit_legacy_style_config_path(self):
         with tempfile.TemporaryDirectory() as temp_dir:
-            home_dir = Path(temp_dir) / "home"
-            home_dir.mkdir()
-            legacy_path = home_dir / ".voice-dashboard.json"
-            legacy_path.write_text("{}", encoding="utf-8")
+            legacy_path = Path(temp_dir) / ".voice-dashboard.json"
+            legacy_path.write_text(
+                json.dumps(
+                    {
+                        "defaults": {
+                            "voice_id": "legacy-voice",
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
 
-            result = self.run_ttsrun("config", "show", env_overrides={"HOME": str(home_dir)})
+            result = self.run_ttsrun("config", "show", "--config", str(legacy_path))
 
         self.assertEqual(result.returncode, ExitCode.OK, result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["config_path"], str(legacy_path))
-        self.assertTrue(payload["using_legacy_config_path"])
+        self.assertEqual(payload["defaults"]["voice_id"], "legacy-voice")
+        self.assertTrue(payload["config_exists"])
 
     def test_installed_config_init_writes_default_config_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             home_dir = Path(temp_dir) / "home"
             home_dir.mkdir()
-            expected_path = home_dir / ".config" / "voice-dashboard" / "config.json"
+            xdg_config_home = Path(temp_dir) / "xdg-config"
+            expected_path = xdg_config_home / "voice-dashboard" / "config.json"
 
-            result = self.run_ttsrun("config", "init", env_overrides={"HOME": str(home_dir)})
+            result = self.run_ttsrun(
+                "config",
+                "init",
+                env_overrides={
+                    "HOME": str(home_dir),
+                    "XDG_CONFIG_HOME": str(xdg_config_home),
+                },
+            )
 
             self.assertEqual(result.returncode, ExitCode.OK, result.stderr)
             self.assertTrue(expected_path.exists())
@@ -168,7 +193,8 @@ class InstalledCLITests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             home_dir = Path(temp_dir) / "home"
             home_dir.mkdir()
-            config_path = home_dir / ".config" / "voice-dashboard" / "config.json"
+            xdg_config_home = Path(temp_dir) / "xdg-config"
+            config_path = xdg_config_home / "voice-dashboard" / "config.json"
             config_path.parent.mkdir(parents=True, exist_ok=True)
             config_path.write_text(
                 json.dumps(
@@ -183,7 +209,14 @@ class InstalledCLITests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self.run_ttsrun("config", "show", env_overrides={"HOME": str(home_dir)})
+            result = self.run_ttsrun(
+                "config",
+                "show",
+                env_overrides={
+                    "HOME": str(home_dir),
+                    "XDG_CONFIG_HOME": str(xdg_config_home),
+                },
+            )
 
         self.assertEqual(result.returncode, ExitCode.OK, result.stderr)
         payload = json.loads(result.stdout)
