@@ -2,7 +2,7 @@
 
 <div align="center">
 
-# 🎙️ voice-dashboard
+# 🎙️ Voice Dashboard
 
 > A practical MiniMax batch Text-to-Speech CLI for daily workflows.
 
