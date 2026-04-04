@@ -80,23 +80,47 @@ class CLITests(unittest.TestCase):
         self.assertIn("voice_id", payload["defaults"])
 
     def test_print_config_path_uses_resolved_path(self):
-        stdout_buffer = io.StringIO()
-        stderr_buffer = io.StringIO()
-        with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
-            exit_code = cli.main(["--print-config-path"])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_dir = Path(temp_dir) / "home"
+            home_dir.mkdir()
+            stdout_buffer = io.StringIO()
+            stderr_buffer = io.StringIO()
 
-        self.assertEqual(exit_code, ExitCode.OK)
-        self.assertTrue(stdout_buffer.getvalue().strip().endswith(".voice-dashboard.json"))
-        self.assertIn("deprecated", stderr_buffer.getvalue())
-        self.assertIn("ttsrun config path", stderr_buffer.getvalue())
+            with patch.dict(
+                os.environ,
+                {"HOME": str(home_dir)},
+                clear=True,
+            ):
+                with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
+                    exit_code = cli.main(["--print-config-path"])
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual(
+                stdout_buffer.getvalue().strip(),
+                str(home_dir / ".config" / "voice-dashboard" / "config.json"),
+            )
+            self.assertIn("deprecated", stderr_buffer.getvalue())
+            self.assertIn("ttsrun config path", stderr_buffer.getvalue())
 
     def test_config_path_subcommand_uses_resolved_path(self):
-        buffer = io.StringIO()
-        with redirect_stdout(buffer):
-            exit_code = cli.main(["config", "path"])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_dir = Path(temp_dir) / "home"
+            home_dir.mkdir()
+            buffer = io.StringIO()
 
-        self.assertEqual(exit_code, ExitCode.OK)
-        self.assertTrue(buffer.getvalue().strip().endswith(".voice-dashboard.json"))
+            with patch.dict(
+                os.environ,
+                {"HOME": str(home_dir)},
+                clear=True,
+            ):
+                with redirect_stdout(buffer):
+                    exit_code = cli.main(["config", "path"])
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual(
+                buffer.getvalue().strip(),
+                str(home_dir / ".config" / "voice-dashboard" / "config.json"),
+            )
 
     def test_config_path_subcommand_uses_new_default_location_for_new_users(self):
         with tempfile.TemporaryDirectory() as temp_dir:
