@@ -151,17 +151,14 @@ Reasons:
 The config should answer two questions:
 
 1. which provider is the default
-2. what defaults apply for common settings and provider-specific settings
+2. what defaults apply globally vs per provider
 
 Recommended shape:
 
 ```json
 {
-  "provider": "minimax",
-  "defaults": {
-    "voice_id": "clone_voice_can",
-    "model": "speech-2.8-hd",
-    "speed": 1.2,
+  "default_provider": "minimax",
+  "global": {
     "format": "mp3",
     "request_timeout_seconds": 60,
     "max_retries": 3,
@@ -170,12 +167,17 @@ Recommended shape:
   },
   "providers": {
     "minimax": {
+      "voice_id": "clone_voice_can",
+      "model": "speech-2.8-hd",
+      "speed": 1.2,
       "pitch": 0,
       "language_boost": "Chinese,Yue",
       "sample_rate": 32000
     },
     "elevenlabs": {
-      "output_format": "mp3_44100_128"
+      "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+      "model": "eleven_multilingual_v2",
+      "speed": 1.0
     }
   }
 }
@@ -183,11 +185,10 @@ Recommended shape:
 
 ### Backward compatibility
 
-Recommended rules:
+Not required for this migration.
 
-- if `provider` is absent, default to `minimax`
-- if `providers.minimax` is absent, continue reading legacy MiniMax keys from `defaults`
-- old MiniMax-only config should continue to work without migration
+- use the new `default_provider` / `global` / `providers` schema only
+- do not continue parsing legacy `provider` / `defaults`
 
 ## 8. CLI Design
 
@@ -439,7 +440,7 @@ Use config to define the default provider:
 
 ```json
 {
-  "provider": "elevenlabs"
+  "default_provider": "elevenlabs"
 }
 ```
 

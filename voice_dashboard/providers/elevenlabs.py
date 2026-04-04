@@ -4,12 +4,14 @@ import os
 
 import requests
 
-from voice_dashboard.defaults import DEFAULT_MODEL
+from voice_dashboard.defaults import (
+    DEFAULT_MODEL,
+    ELEVENLABS_DEFAULT_MODEL,
+)
 from voice_dashboard.errors import ApiError, AuthenticationError, RetryableApiError
 
 
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech"
-ELEVENLABS_DEFAULT_MODEL = "eleven_multilingual_v2"
 ELEVENLABS_OUTPUT_FORMAT = "mp3_44100_128"
 
 

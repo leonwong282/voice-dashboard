@@ -16,6 +16,22 @@ from voice_dashboard import cli, pipeline
 from voice_dashboard.errors import ExitCode
 
 
+TEST_ENV_ROOT = Path(tempfile.mkdtemp(prefix="voice-dashboard-tests-"))
+TEST_HOME = TEST_ENV_ROOT / "home"
+TEST_XDG_CONFIG_HOME = TEST_ENV_ROOT / "xdg-config"
+TEST_HOME.mkdir(parents=True, exist_ok=True)
+TEST_XDG_CONFIG_HOME.mkdir(parents=True, exist_ok=True)
+
+
+def build_test_env(**overrides):
+    env = {
+        "HOME": str(TEST_HOME),
+        "XDG_CONFIG_HOME": str(TEST_XDG_CONFIG_HOME),
+    }
+    env.update(overrides)
+    return env
+
+
 class MockResponse:
     def __init__(self, status_code, payload=None, text="", content=b""):
         self.status_code = status_code
@@ -64,12 +80,14 @@ class CLITests(unittest.TestCase):
 
         self.assertEqual(exit_code, ExitCode.OK)
         payload = json.loads(stdout_buffer.getvalue())
-        self.assertEqual(payload["provider"], "minimax")
-        self.assertIn("defaults", payload)
+        self.assertEqual(payload["default_provider"], "minimax")
+        self.assertIn("global", payload)
         self.assertIn("providers", payload)
-        self.assertIn("voice_id", payload["defaults"])
-        self.assertIn("output_root", payload["defaults"])
-        self.assertIn("format", payload["defaults"])
+        self.assertIn("voice_id", payload["providers"]["minimax"])
+        self.assertIn("output_root", payload["global"])
+        self.assertIn("format", payload["global"])
+        self.assertIn("voice_id", payload["providers"]["elevenlabs"])
+        self.assertIn("model", payload["providers"]["elevenlabs"])
         self.assertIn("deprecated", stderr_buffer.getvalue())
         self.assertIn("ttsrun config example", stderr_buffer.getvalue())
 
@@ -80,10 +98,10 @@ class CLITests(unittest.TestCase):
 
         self.assertEqual(exit_code, ExitCode.OK)
         payload = json.loads(buffer.getvalue())
-        self.assertEqual(payload["provider"], "minimax")
-        self.assertIn("defaults", payload)
+        self.assertEqual(payload["default_provider"], "minimax")
+        self.assertIn("global", payload)
         self.assertIn("providers", payload)
-        self.assertIn("voice_id", payload["defaults"])
+        self.assertIn("voice_id", payload["providers"]["minimax"])
 
     def test_print_config_path_uses_resolved_path(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -179,7 +197,8 @@ class CLITests(unittest.TestCase):
             self.assertEqual(exit_code, ExitCode.OK)
             self.assertTrue(config_path.exists())
             payload = json.loads(config_path.read_text(encoding="utf-8"))
-            self.assertIn("defaults", payload)
+            self.assertIn("global", payload)
+            self.assertIn("providers", payload)
             self.assertIn("Wrote example config", stdout_buffer.getvalue())
             self.assertIn("deprecated", stderr_buffer.getvalue())
             self.assertIn("ttsrun config init", stderr_buffer.getvalue())
@@ -197,7 +216,8 @@ class CLITests(unittest.TestCase):
             self.assertEqual(exit_code, ExitCode.OK)
             self.assertTrue(config_path.exists())
             payload = json.loads(config_path.read_text(encoding="utf-8"))
-            self.assertIn("defaults", payload)
+            self.assertIn("global", payload)
+            self.assertIn("providers", payload)
             self.assertIn("Wrote example config", buffer.getvalue())
 
     def test_config_init_subcommand_writes_new_default_path_for_new_users(self):
@@ -222,7 +242,7 @@ class CLITests(unittest.TestCase):
     def test_doctor_reports_missing_api_key(self):
         stdout_buffer = io.StringIO()
         stderr_buffer = io.StringIO()
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, build_test_env(), clear=True):
             with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
                 exit_code = cli.main(["--doctor"])
 
@@ -233,7 +253,7 @@ class CLITests(unittest.TestCase):
 
     def test_doctor_subcommand_reports_missing_api_key(self):
         buffer = io.StringIO()
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, build_test_env(), clear=True):
             with redirect_stdout(buffer):
                 exit_code = cli.main(["doctor"])
 
@@ -242,7 +262,7 @@ class CLITests(unittest.TestCase):
 
     def test_doctor_subcommand_honors_provider_override(self):
         buffer = io.StringIO()
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, build_test_env(), clear=True):
             with redirect_stdout(buffer):
                 exit_code = cli.main(["doctor", "--provider", "elevenlabs"])
 
@@ -255,10 +275,10 @@ class CLITests(unittest.TestCase):
         buffer = io.StringIO()
         with patch.dict(
             os.environ,
-            {
-                "MINIMAX_API_KEY": "minimax-key",
-                "ELEVENLABS_API_KEY": "elevenlabs-key",
-            },
+            build_test_env(
+                MINIMAX_API_KEY="minimax-key",
+                ELEVENLABS_API_KEY="elevenlabs-key",
+            ),
             clear=True,
         ):
             with redirect_stdout(buffer):
@@ -276,7 +296,7 @@ class CLITests(unittest.TestCase):
             input_path.write_text("第一段", encoding="utf-8")
             config_path.write_text("{invalid", encoding="utf-8")
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 exit_code = cli.main([str(input_path), "--config", str(config_path)])
 
         self.assertEqual(exit_code, ExitCode.CONFIG)
@@ -286,7 +306,7 @@ class CLITests(unittest.TestCase):
             input_path = Path(temp_dir) / "input.txt"
             input_path.write_text("第一段", encoding="utf-8")
 
-            with patch.dict(os.environ, {}, clear=True):
+            with patch.dict(os.environ, build_test_env(), clear=True):
                 exit_code = cli.main([str(input_path)])
 
         self.assertEqual(exit_code, ExitCode.AUTH)
@@ -297,8 +317,9 @@ class CLITests(unittest.TestCase):
         self.assertEqual(context.exception.code, 2)
 
     def test_main_requires_exactly_one_input_source(self):
-        with self.assertRaises(SystemExit) as context:
-            cli.main([])
+        with patch.dict(os.environ, build_test_env(), clear=True):
+            with self.assertRaises(SystemExit) as context:
+                cli.main([])
         self.assertEqual(context.exception.code, 2)
 
     def test_main_rejects_non_integer_pitch(self):
@@ -307,20 +328,23 @@ class CLITests(unittest.TestCase):
         self.assertEqual(context.exception.code, 2)
 
     def test_elevenlabs_rejects_pitch_flag(self):
-        with self.assertRaises(SystemExit) as context:
-            cli.main(["sample.txt", "--provider", "elevenlabs", "--pitch", "1"])
+        with patch.dict(os.environ, build_test_env(), clear=True):
+            with self.assertRaises(SystemExit) as context:
+                cli.main(["sample.txt", "--provider", "elevenlabs", "--pitch", "1"])
         self.assertEqual(context.exception.code, 2)
 
     def test_elevenlabs_rejects_language_boost_flag(self):
-        with self.assertRaises(SystemExit) as context:
-            cli.main(
-                ["sample.txt", "--provider", "elevenlabs", "--language-boost", "Chinese,Yue"]
-            )
+        with patch.dict(os.environ, build_test_env(), clear=True):
+            with self.assertRaises(SystemExit) as context:
+                cli.main(
+                    ["sample.txt", "--provider", "elevenlabs", "--language-boost", "Chinese,Yue"]
+                )
         self.assertEqual(context.exception.code, 2)
 
     def test_elevenlabs_rejects_sample_rate_flag(self):
-        with self.assertRaises(SystemExit) as context:
-            cli.main(["sample.txt", "--provider", "elevenlabs", "--sample-rate", "32000"])
+        with patch.dict(os.environ, build_test_env(), clear=True):
+            with self.assertRaises(SystemExit) as context:
+                cli.main(["sample.txt", "--provider", "elevenlabs", "--sample-rate", "32000"])
         self.assertEqual(context.exception.code, 2)
 
     def test_wrapper_voice_py_uses_new_cli(self):
@@ -333,7 +357,7 @@ class CLITests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch("voice_dashboard.pipeline.requests.post", return_value=response):
                     exit_code = voice.main([str(input_path), "--output-dir", str(output_dir)])
             self.assertEqual(exit_code, ExitCode.OK)
@@ -349,7 +373,7 @@ class CLITests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch("voice_dashboard.pipeline.requests.post", return_value=response):
                     exit_code = cli.main(
                         ["run", str(input_path), "--output-dir", str(output_dir)]
@@ -366,7 +390,7 @@ class CLITests(unittest.TestCase):
             (output_dir / "stale.txt").write_text("keep", encoding="utf-8")
             stderr_buffer = io.StringIO()
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with redirect_stderr(stderr_buffer):
                     exit_code = cli.main(
                         [str(input_path), "--output-dir", str(output_dir)]
@@ -387,7 +411,7 @@ class CLITests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch("voice_dashboard.pipeline.requests.post", return_value=response):
                     exit_code = cli.main(
                         [
@@ -411,15 +435,19 @@ class CLITests(unittest.TestCase):
             config_path.write_text(
                 json.dumps(
                     {
-                        "defaults": {
-                            "voice_id": "cfg-voice",
-                            "speed": 1.6,
-                            "pitch": 2,
-                            "language_boost": "Chinese,Mandarin",
-                            "model": "cfg-model",
-                            "sample_rate": 44100,
+                        "global": {
                             "output_root": str(custom_root),
-                        }
+                        },
+                        "providers": {
+                            "minimax": {
+                                "voice_id": "cfg-voice",
+                                "speed": 1.6,
+                                "pitch": 2,
+                                "language_boost": "Chinese,Mandarin",
+                                "model": "cfg-model",
+                                "sample_rate": 44100,
+                            }
+                        },
                     },
                     ensure_ascii=False,
                 ),
@@ -430,7 +458,7 @@ class CLITests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post", return_value=response
                 ) as mock_post:
@@ -453,15 +481,15 @@ class CLITests(unittest.TestCase):
             config_path.write_text(
                 json.dumps(
                     {
-                        "provider": "minimax",
-                        "defaults": {
-                            "voice_id": "cfg-voice",
-                            "speed": 1.6,
-                            "model": "cfg-model",
+                        "default_provider": "minimax",
+                        "global": {
                             "output_root": str(custom_root),
                         },
                         "providers": {
                             "minimax": {
+                                "voice_id": "cfg-voice",
+                                "speed": 1.6,
+                                "model": "cfg-model",
                                 "pitch": 2,
                                 "language_boost": "Chinese,Mandarin",
                                 "sample_rate": 44100,
@@ -477,7 +505,7 @@ class CLITests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post", return_value=response
                 ) as mock_post:
@@ -499,7 +527,7 @@ class CLITests(unittest.TestCase):
             config_path.write_text(
                 json.dumps(
                     {
-                        "defaults": {
+                        "global": {
                             "request_timeout_seconds": 7,
                             "max_retries": 2,
                         }
@@ -513,7 +541,7 @@ class CLITests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post",
                     side_effect=[requests.ConnectionError("temporary"), success_response],
@@ -535,7 +563,7 @@ class CLITests(unittest.TestCase):
             config_path.write_text(
                 json.dumps(
                     {
-                        "defaults": {
+                        "global": {
                             "request_timeout_seconds": 30,
                             "max_retries": 1,
                         }
@@ -549,7 +577,7 @@ class CLITests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post",
                     side_effect=[requests.ConnectionError("temporary"), success_response],
@@ -577,38 +605,13 @@ class CLITests(unittest.TestCase):
             config_path.write_text(
                 json.dumps(
                     {
-                        "defaults": {
-                            "voice_id": "cfg-voice",
+                        "global": {
                             "output_root": str(Path(temp_dir) / "tts-output"),
-                        }
-                    },
-                    ensure_ascii=False,
-                ),
-                encoding="utf-8",
-            )
-            buffer = io.StringIO()
-
-            with redirect_stdout(buffer):
-                exit_code = cli.main(
-                    ["config", "show", "--config", str(config_path)]
-                )
-
-            self.assertEqual(exit_code, ExitCode.OK)
-            payload = json.loads(buffer.getvalue())
-            self.assertEqual(payload["provider"], "minimax")
-            self.assertEqual(payload["defaults"]["voice_id"], "cfg-voice")
-            self.assertEqual(payload["config_path"], str(config_path))
-            self.assertTrue(payload["config_exists"])
-
-    def test_config_show_reports_explicit_provider(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            config_path = Path(temp_dir) / "config.json"
-            config_path.write_text(
-                json.dumps(
-                    {
-                        "provider": "elevenlabs",
-                        "defaults": {
-                            "voice_id": "voice-123",
+                        },
+                        "providers": {
+                            "minimax": {
+                                "voice_id": "cfg-voice",
+                            }
                         },
                     },
                     ensure_ascii=False,
@@ -624,8 +627,39 @@ class CLITests(unittest.TestCase):
 
             self.assertEqual(exit_code, ExitCode.OK)
             payload = json.loads(buffer.getvalue())
-            self.assertEqual(payload["provider"], "elevenlabs")
-            self.assertEqual(payload["defaults"]["voice_id"], "voice-123")
+            self.assertEqual(payload["default_provider"], "minimax")
+            self.assertEqual(payload["providers"]["minimax"]["voice_id"], "cfg-voice")
+            self.assertEqual(payload["config_path"], str(config_path))
+            self.assertTrue(payload["config_exists"])
+
+    def test_config_show_reports_explicit_provider(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_provider": "elevenlabs",
+                        "providers": {
+                            "elevenlabs": {
+                                "voice_id": "voice-123",
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            buffer = io.StringIO()
+
+            with redirect_stdout(buffer):
+                exit_code = cli.main(
+                    ["config", "show", "--config", str(config_path)]
+                )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            payload = json.loads(buffer.getvalue())
+            self.assertEqual(payload["default_provider"], "elevenlabs")
+            self.assertEqual(payload["providers"]["elevenlabs"]["voice_id"], "voice-123")
 
     def test_config_show_includes_runtime_defaults(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -633,7 +667,7 @@ class CLITests(unittest.TestCase):
             config_path.write_text(
                 json.dumps(
                     {
-                        "defaults": {
+                        "global": {
                             "request_timeout_seconds": 12,
                             "max_retries": 4,
                         }
@@ -651,8 +685,31 @@ class CLITests(unittest.TestCase):
 
             self.assertEqual(exit_code, ExitCode.OK)
             payload = json.loads(buffer.getvalue())
-            self.assertEqual(payload["defaults"]["request_timeout_seconds"], 12)
-            self.assertEqual(payload["defaults"]["max_retries"], 4)
+            self.assertEqual(payload["global"]["request_timeout_seconds"], 12)
+            self.assertEqual(payload["global"]["max_retries"], 4)
+
+    def test_legacy_config_schema_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            stderr_buffer = io.StringIO()
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider": "minimax",
+                        "defaults": {
+                            "voice_id": "legacy-voice",
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            with redirect_stderr(stderr_buffer):
+                exit_code = cli.main(["config", "show", "--config", str(config_path)])
+
+            self.assertEqual(exit_code, ExitCode.CONFIG)
+            self.assertIn("Legacy config schema is not supported", stderr_buffer.getvalue())
 
     def test_config_show_reports_legacy_resolution_metadata(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -690,7 +747,7 @@ class InputSourceTests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch("sys.stdin", io.StringIO("第一段\n\n第二段\n")):
                     with patch(
                         "voice_dashboard.pipeline.requests.post", return_value=response
@@ -708,7 +765,7 @@ class InputSourceTests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.input_sources.shutil.which",
                     return_value="/usr/bin/pbpaste",
@@ -743,7 +800,7 @@ class InputSourceTests(unittest.TestCase):
                     return "/usr/bin/xclip"
                 return None
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.input_sources.shutil.which",
                     side_effect=which_side_effect,
@@ -784,7 +841,7 @@ class BatchFlowTests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post", return_value=response
                 ):
@@ -819,7 +876,7 @@ class BatchFlowTests(unittest.TestCase):
                 {"base_resp": {"status_msg": "invalid text"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post",
                     side_effect=[success_response, failure_response, success_response],
@@ -856,7 +913,7 @@ class BatchFlowTests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post", return_value=response
                 ):
@@ -886,7 +943,7 @@ class BatchFlowTests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post", return_value=response
                 ):
@@ -938,7 +995,7 @@ class BatchFlowTests(unittest.TestCase):
                     raise OSError("permission denied")
                 return real_move(src, dst)
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post", return_value=response
                 ):
@@ -983,7 +1040,7 @@ class BatchFlowTests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post", return_value=response
                 ):
@@ -1032,7 +1089,7 @@ class BatchFlowTests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post", return_value=response
                 ):
@@ -1068,7 +1125,7 @@ class BatchFlowTests(unittest.TestCase):
                 {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
             )
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post",
                     side_effect=[requests.ConnectionError("temporary"), success_response],
@@ -1087,10 +1144,12 @@ class BatchFlowTests(unittest.TestCase):
             config_path.write_text(
                 json.dumps(
                     {
-                        "provider": "elevenlabs",
-                        "defaults": {
-                            "voice_id": "voice-123",
-                            "model": "eleven-model",
+                        "default_provider": "elevenlabs",
+                        "providers": {
+                            "elevenlabs": {
+                                "voice_id": "voice-123",
+                                "model": "eleven-model",
+                            }
                         },
                     },
                     ensure_ascii=False,
@@ -1099,7 +1158,7 @@ class BatchFlowTests(unittest.TestCase):
             )
             response = MockResponse(200, content=b"ELVN")
 
-            with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(ELEVENLABS_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.providers.elevenlabs.requests.post",
                     return_value=response,
@@ -1133,7 +1192,7 @@ class BatchFlowTests(unittest.TestCase):
             )
             self.assertEqual(
                 mock_post.call_args.kwargs["json"]["voice_settings"]["speed"],
-                1.2,
+                1.0,
             )
 
     def test_cli_provider_overrides_config_provider(self):
@@ -1145,10 +1204,12 @@ class BatchFlowTests(unittest.TestCase):
             config_path.write_text(
                 json.dumps(
                     {
-                        "provider": "minimax",
-                        "defaults": {
-                            "voice_id": "voice-123",
-                            "model": "cfg-model",
+                        "default_provider": "minimax",
+                        "providers": {
+                            "minimax": {
+                                "voice_id": "voice-123",
+                                "model": "cfg-model",
+                            }
                         },
                     },
                     ensure_ascii=False,
@@ -1159,10 +1220,10 @@ class BatchFlowTests(unittest.TestCase):
 
             with patch.dict(
                 os.environ,
-                {
-                    "MINIMAX_API_KEY": "minimax-key",
-                    "ELEVENLABS_API_KEY": "elevenlabs-key",
-                },
+                build_test_env(
+                    MINIMAX_API_KEY="minimax-key",
+                    ELEVENLABS_API_KEY="elevenlabs-key",
+                ),
                 clear=True,
             ):
                 with patch("voice_dashboard.pipeline.requests.post") as minimax_post:
@@ -1196,9 +1257,11 @@ class BatchFlowTests(unittest.TestCase):
             config_path.write_text(
                 json.dumps(
                     {
-                        "provider": "elevenlabs",
-                        "defaults": {
-                            "voice_id": "voice-123",
+                        "default_provider": "elevenlabs",
+                        "providers": {
+                            "elevenlabs": {
+                                "voice_id": "voice-123",
+                            }
                         },
                     },
                     ensure_ascii=False,
@@ -1207,7 +1270,7 @@ class BatchFlowTests(unittest.TestCase):
             )
             response = MockResponse(200, content=b"ELVN")
 
-            with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(ELEVENLABS_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.providers.elevenlabs.requests.post",
                     return_value=response,
@@ -1241,7 +1304,7 @@ class BatchFlowTests(unittest.TestCase):
                 text='{"detail":{"message":"Unauthorized"}}',
             )
 
-            with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(ELEVENLABS_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.providers.elevenlabs.requests.post",
                     return_value=response,
@@ -1273,7 +1336,7 @@ class BatchFlowTests(unittest.TestCase):
                 text='{"detail":{"message":"Forbidden"}}',
             )
 
-            with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(ELEVENLABS_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.providers.elevenlabs.requests.post",
                     return_value=response,
@@ -1301,7 +1364,7 @@ class BatchFlowTests(unittest.TestCase):
             input_path.write_text("第一段", encoding="utf-8")
             success_response = MockResponse(200, content=b"ELVN")
 
-            with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(ELEVENLABS_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.providers.elevenlabs.requests.post",
                     side_effect=[requests.ConnectionError("temporary"), success_response],
@@ -1335,7 +1398,7 @@ class BatchFlowTests(unittest.TestCase):
             )
             success_response = MockResponse(200, content=b"ELVN")
 
-            with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(ELEVENLABS_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.providers.elevenlabs.requests.post",
                     side_effect=[retry_response, success_response],
@@ -1369,7 +1432,7 @@ class BatchFlowTests(unittest.TestCase):
             stdout_buffer = io.StringIO()
             stderr_buffer = io.StringIO()
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post", return_value=response
                 ):
@@ -1400,7 +1463,7 @@ class BatchFlowTests(unittest.TestCase):
             )
             stderr_buffer = io.StringIO()
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post", return_value=response
                 ):
@@ -1423,7 +1486,7 @@ class BatchFlowTests(unittest.TestCase):
             )
             stderr_buffer = io.StringIO()
 
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
                 with patch(
                     "voice_dashboard.pipeline.requests.post", return_value=response
                 ):

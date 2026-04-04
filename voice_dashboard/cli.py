@@ -13,7 +13,12 @@ from voice_dashboard.config import (
     serialize_config,
     write_example_config,
 )
-from voice_dashboard.defaults import DEFAULT_FORMAT
+from voice_dashboard.defaults import (
+    DEFAULT_FORMAT,
+    DEFAULT_LANGUAGE_BOOST,
+    DEFAULT_PITCH,
+    DEFAULT_SAMPLE_RATE,
+)
 from voice_dashboard.errors import (
     ConfigError,
     ExitCode,
@@ -311,16 +316,32 @@ def validate_provider_options(
         )
 
 
-def resolve_settings(args: argparse.Namespace, config: AppConfig) -> TTSSettings:
+def resolve_settings(
+    args: argparse.Namespace,
+    config: AppConfig,
+    provider_name: str,
+) -> TTSSettings:
+    provider_config = config.provider_config(provider_name)
+    language_boost = DEFAULT_LANGUAGE_BOOST
+    pitch = DEFAULT_PITCH
+    sample_rate = DEFAULT_SAMPLE_RATE
+
+    if provider_name == "minimax":
+        language_boost = args.language_boost or config.minimax.language_boost
+        pitch = args.pitch if args.pitch is not None else config.minimax.pitch
+        sample_rate = (
+            args.sample_rate
+            if args.sample_rate is not None
+            else config.minimax.sample_rate
+        )
+
     return TTSSettings(
-        model=args.model or config.model,
-        language_boost=args.language_boost or config.language_boost,
-        voice_id=args.voice_id or config.voice_id,
-        speed=args.speed if args.speed is not None else config.speed,
-        pitch=args.pitch if args.pitch is not None else config.pitch,
-        sample_rate=(
-            args.sample_rate if args.sample_rate is not None else config.sample_rate
-        ),
+        model=args.model or provider_config.model,
+        language_boost=language_boost,
+        voice_id=args.voice_id or provider_config.voice_id,
+        speed=args.speed if args.speed is not None else provider_config.speed,
+        pitch=pitch,
+        sample_rate=sample_rate,
         audio_format=args.format or config.audio_format,
     )
 
@@ -579,7 +600,7 @@ def run_batch_command(
     provider_name = resolve_provider(args, config)
     validate_provider_options(parser, args, provider_name)
     source = resolve_input_source(parser, args)
-    settings = resolve_settings(args, config)
+    settings = resolve_settings(args, config, provider_name)
     request_settings = resolve_request_settings(args, config)
     output_root = (
         Path(args.output_root).expanduser() if args.output_root else config.output_root

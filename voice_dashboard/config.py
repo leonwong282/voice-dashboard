@@ -7,12 +7,15 @@ from voice_dashboard.defaults import (
     DEFAULT_FORMAT,
     DEFAULT_LANGUAGE_BOOST,
     DEFAULT_MAX_RETRIES,
-    DEFAULT_MODEL,
     DEFAULT_PITCH,
     DEFAULT_SAMPLE_RATE,
-    DEFAULT_SPEED,
     DEFAULT_TIMEOUT_SECONDS,
-    DEFAULT_VOICE_ID,
+    ELEVENLABS_DEFAULT_MODEL,
+    ELEVENLABS_DEFAULT_SPEED,
+    ELEVENLABS_DEFAULT_VOICE_ID,
+    MINIMAX_DEFAULT_MODEL,
+    MINIMAX_DEFAULT_SPEED,
+    MINIMAX_DEFAULT_VOICE_ID,
     default_config_path,
     default_output_root,
     legacy_config_path,
@@ -25,37 +28,70 @@ from voice_dashboard.providers.registry import (
 
 
 @dataclass(frozen=True)
+class GlobalConfig:
+    output_root: Path = field(default_factory=default_output_root)
+    audio_format: str = DEFAULT_FORMAT
+    request_timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
+    max_retries: int = DEFAULT_MAX_RETRIES
+    open_after_finish: bool = False
+
+
+@dataclass(frozen=True)
 class MiniMaxConfig:
+    voice_id: str = MINIMAX_DEFAULT_VOICE_ID
+    speed: float = MINIMAX_DEFAULT_SPEED
+    model: str = MINIMAX_DEFAULT_MODEL
     pitch: int = DEFAULT_PITCH
     language_boost: str = DEFAULT_LANGUAGE_BOOST
     sample_rate: int = DEFAULT_SAMPLE_RATE
 
 
 @dataclass(frozen=True)
+class ElevenLabsConfig:
+    voice_id: str = ELEVENLABS_DEFAULT_VOICE_ID
+    speed: float = ELEVENLABS_DEFAULT_SPEED
+    model: str = ELEVENLABS_DEFAULT_MODEL
+
+
+@dataclass(frozen=True)
 class AppConfig:
-    provider: str = DEFAULT_PROVIDER_NAME
-    voice_id: str = DEFAULT_VOICE_ID
-    speed: float = DEFAULT_SPEED
-    model: str = DEFAULT_MODEL
-    audio_format: str = DEFAULT_FORMAT
-    request_timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
-    max_retries: int = DEFAULT_MAX_RETRIES
-    output_root: Path = field(default_factory=default_output_root)
-    open_after_finish: bool = False
+    default_provider: str = DEFAULT_PROVIDER_NAME
+    global_options: GlobalConfig = field(default_factory=GlobalConfig)
     minimax: MiniMaxConfig = field(default_factory=MiniMaxConfig)
+    elevenlabs: ElevenLabsConfig = field(default_factory=ElevenLabsConfig)
     config_path: Path = field(default_factory=default_config_path)
 
     @property
-    def pitch(self) -> int:
-        return self.minimax.pitch
+    def provider(self) -> str:
+        return self.default_provider
 
     @property
-    def language_boost(self) -> str:
-        return self.minimax.language_boost
+    def output_root(self) -> Path:
+        return self.global_options.output_root
 
     @property
-    def sample_rate(self) -> int:
-        return self.minimax.sample_rate
+    def audio_format(self) -> str:
+        return self.global_options.audio_format
+
+    @property
+    def request_timeout_seconds(self) -> int:
+        return self.global_options.request_timeout_seconds
+
+    @property
+    def max_retries(self) -> int:
+        return self.global_options.max_retries
+
+    @property
+    def open_after_finish(self) -> bool:
+        return self.global_options.open_after_finish
+
+    def provider_config(self, provider_name: str) -> MiniMaxConfig | ElevenLabsConfig:
+        if provider_name == "minimax":
+            return self.minimax
+        if provider_name == "elevenlabs":
+            return self.elevenlabs
+        supported = ", ".join(SUPPORTED_PROVIDER_NAMES)
+        raise ConfigError(f"Unsupported provider '{provider_name}'. Supported: {supported}.")
 
 
 def _coerce_str(value: Any, field_name: str) -> str:
@@ -89,7 +125,7 @@ def _coerce_bool(value: Any, field_name: str) -> bool:
     return value
 
 
-def _coerce_provider(value: Any, field_name: str = "provider") -> str:
+def _coerce_provider(value: Any, field_name: str = "default_provider") -> str:
     provider = _coerce_str(value, field_name)
     if provider not in SUPPORTED_PROVIDER_NAMES:
         supported = ", ".join(SUPPORTED_PROVIDER_NAMES)
@@ -97,6 +133,26 @@ def _coerce_provider(value: Any, field_name: str = "provider") -> str:
             f"Config field '{field_name}' must be one of: {supported}."
         )
     return provider
+
+
+def _expect_object(value: Any, field_name: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ConfigError(f"Config key '{field_name}' must be a JSON object.")
+    return value
+
+
+def _check_for_legacy_schema(payload: dict[str, Any]) -> None:
+    legacy_keys = []
+    if "provider" in payload:
+        legacy_keys.append("provider")
+    if "defaults" in payload:
+        legacy_keys.append("defaults")
+    if legacy_keys:
+        keys = ", ".join(legacy_keys)
+        raise ConfigError(
+            f"Legacy config schema is not supported ({keys}). "
+            "Use 'default_provider', 'global', and 'providers'."
+        )
 
 
 def example_config() -> dict[str, Any]:
@@ -107,29 +163,19 @@ def serialize_config(
     config: AppConfig,
     include_metadata: bool = False,
 ) -> dict[str, Any]:
-    defaults = {
-        "voice_id": config.voice_id,
-        "speed": config.speed,
-        "model": config.model,
-        "output_root": str(config.output_root),
-        "format": config.audio_format,
-        "request_timeout_seconds": config.request_timeout_seconds,
-        "max_retries": config.max_retries,
-        "open_after_finish": config.open_after_finish,
-    }
-    providers = {
-        "minimax": {
-            "pitch": config.pitch,
-            "language_boost": config.language_boost,
-            "sample_rate": config.sample_rate,
-        },
-        "elevenlabs": {},
-    }
-
     payload: dict[str, Any] = {
-        "provider": config.provider,
-        "defaults": defaults,
-        "providers": providers,
+        "default_provider": config.default_provider,
+        "global": {
+            "output_root": str(config.output_root),
+            "format": config.audio_format,
+            "request_timeout_seconds": config.request_timeout_seconds,
+            "max_retries": config.max_retries,
+            "open_after_finish": config.open_after_finish,
+        },
+        "providers": {
+            "minimax": asdict(config.minimax),
+            "elevenlabs": asdict(config.elevenlabs),
+        },
     }
     if include_metadata:
         preferred_config_path = default_config_path()
@@ -186,76 +232,101 @@ def load_config(config_path: str | None) -> AppConfig:
     if not isinstance(payload, dict):
         raise ConfigError(f"Config file must contain a JSON object: {resolved_path}")
 
-    provider_values = payload.get("providers", {})
-    if provider_values and not isinstance(provider_values, dict):
-        raise ConfigError("Config key 'providers' must be a JSON object.")
+    _check_for_legacy_schema(payload)
 
-    values = payload.get("defaults", payload)
-    if not isinstance(values, dict):
-        raise ConfigError("Config key 'defaults' must be a JSON object.")
+    global_values = payload.get("global", {})
+    providers_values = payload.get("providers", {})
+    global_values = _expect_object(global_values, "global")
+    providers_values = _expect_object(providers_values, "providers")
+
+    unknown_provider_keys = set(providers_values) - set(SUPPORTED_PROVIDER_NAMES)
+    if unknown_provider_keys:
+        unknown = ", ".join(sorted(unknown_provider_keys))
+        supported = ", ".join(SUPPORTED_PROVIDER_NAMES)
+        raise ConfigError(
+            f"Unsupported provider section(s): {unknown}. Supported: {supported}."
+        )
 
     config = AppConfig(config_path=resolved_path)
-    updates: dict[str, Any] = {}
+    app_updates: dict[str, Any] = {}
+    global_updates: dict[str, Any] = {}
     minimax_updates: dict[str, Any] = {}
+    elevenlabs_updates: dict[str, Any] = {}
 
-    if "provider" in payload:
-        updates["provider"] = _coerce_provider(payload["provider"])
+    if "default_provider" in payload:
+        app_updates["default_provider"] = _coerce_provider(payload["default_provider"])
 
-    if "voice_id" in values:
-        updates["voice_id"] = _coerce_str(values["voice_id"], "voice_id")
-    if "speed" in values:
-        updates["speed"] = _coerce_float(values["speed"], "speed")
-    if "pitch" in values:
-        minimax_updates["pitch"] = _coerce_int(values["pitch"], "pitch")
-    if "language_boost" in values:
-        minimax_updates["language_boost"] = _coerce_str(
-            values["language_boost"], "language_boost"
-        )
-    if "model" in values:
-        updates["model"] = _coerce_str(values["model"], "model")
-    if "sample_rate" in values:
-        minimax_updates["sample_rate"] = _coerce_int(
-            values["sample_rate"], "sample_rate"
-        )
-    if "request_timeout_seconds" in values:
-        updates["request_timeout_seconds"] = _coerce_positive_int(
-            values["request_timeout_seconds"], "request_timeout_seconds"
-        )
-    if "max_retries" in values:
-        updates["max_retries"] = _coerce_positive_int(
-            values["max_retries"], "max_retries"
-        )
-    if "format" in values:
-        updates["audio_format"] = _coerce_str(values["format"], "format")
-    elif "audio_format" in values:
-        updates["audio_format"] = _coerce_str(
-            values["audio_format"], "audio_format"
-        )
-    if "output_root" in values:
-        updates["output_root"] = Path(
-            _coerce_str(values["output_root"], "output_root")
+    if "output_root" in global_values:
+        global_updates["output_root"] = Path(
+            _coerce_str(global_values["output_root"], "global.output_root")
         ).expanduser()
-    if "open_after_finish" in values:
-        updates["open_after_finish"] = _coerce_bool(
-            values["open_after_finish"], "open_after_finish"
+    if "format" in global_values:
+        global_updates["audio_format"] = _coerce_str(
+            global_values["format"], "global.format"
+        )
+    if "request_timeout_seconds" in global_values:
+        global_updates["request_timeout_seconds"] = _coerce_positive_int(
+            global_values["request_timeout_seconds"],
+            "global.request_timeout_seconds",
+        )
+    if "max_retries" in global_values:
+        global_updates["max_retries"] = _coerce_positive_int(
+            global_values["max_retries"], "global.max_retries"
+        )
+    if "open_after_finish" in global_values:
+        global_updates["open_after_finish"] = _coerce_bool(
+            global_values["open_after_finish"], "global.open_after_finish"
         )
 
-    minimax_values = provider_values.get("minimax", {})
-    if minimax_values and not isinstance(minimax_values, dict):
-        raise ConfigError("Config key 'providers.minimax' must be a JSON object.")
-
+    minimax_values = providers_values.get("minimax", {})
+    minimax_values = _expect_object(minimax_values, "providers.minimax")
+    if "voice_id" in minimax_values:
+        minimax_updates["voice_id"] = _coerce_str(
+            minimax_values["voice_id"], "providers.minimax.voice_id"
+        )
+    if "speed" in minimax_values:
+        minimax_updates["speed"] = _coerce_float(
+            minimax_values["speed"], "providers.minimax.speed"
+        )
+    if "model" in minimax_values:
+        minimax_updates["model"] = _coerce_str(
+            minimax_values["model"], "providers.minimax.model"
+        )
     if "pitch" in minimax_values:
-        minimax_updates["pitch"] = _coerce_int(minimax_values["pitch"], "pitch")
+        minimax_updates["pitch"] = _coerce_int(
+            minimax_values["pitch"], "providers.minimax.pitch"
+        )
     if "language_boost" in minimax_values:
         minimax_updates["language_boost"] = _coerce_str(
-            minimax_values["language_boost"], "language_boost"
+            minimax_values["language_boost"], "providers.minimax.language_boost"
         )
     if "sample_rate" in minimax_values:
         minimax_updates["sample_rate"] = _coerce_int(
-            minimax_values["sample_rate"], "sample_rate"
+            minimax_values["sample_rate"], "providers.minimax.sample_rate"
+        )
+
+    elevenlabs_values = providers_values.get("elevenlabs", {})
+    elevenlabs_values = _expect_object(elevenlabs_values, "providers.elevenlabs")
+    if "voice_id" in elevenlabs_values:
+        elevenlabs_updates["voice_id"] = _coerce_str(
+            elevenlabs_values["voice_id"], "providers.elevenlabs.voice_id"
+        )
+    if "speed" in elevenlabs_values:
+        elevenlabs_updates["speed"] = _coerce_float(
+            elevenlabs_values["speed"], "providers.elevenlabs.speed"
+        )
+    if "model" in elevenlabs_values:
+        elevenlabs_updates["model"] = _coerce_str(
+            elevenlabs_values["model"], "providers.elevenlabs.model"
         )
 
     merged = asdict(config)
-    merged.update(updates)
+    merged.update(app_updates)
+    merged["global_options"] = GlobalConfig(
+        **{**asdict(config.global_options), **global_updates}
+    )
     merged["minimax"] = MiniMaxConfig(**{**asdict(config.minimax), **minimax_updates})
+    merged["elevenlabs"] = ElevenLabsConfig(
+        **{**asdict(config.elevenlabs), **elevenlabs_updates}
+    )
     return AppConfig(**merged)

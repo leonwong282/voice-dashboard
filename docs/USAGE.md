@@ -211,6 +211,8 @@ Default config path:
 
 If you already have the legacy file `~/.voice-dashboard.json`, `ttsrun` keeps using it until you move or replace it.
 
+Important: the config schema is provider-local. `voice_id`, `model`, and `speed` live under each provider, not in a shared `defaults` block.
+
 Print a config example:
 
 ```bash
@@ -235,31 +237,133 @@ Show the effective configuration, including resolved metadata:
 ttsrun config show
 ```
 
-You can save and customize output in the resolved config path, for example:
+### 6.1 How the config is structured
+
+The config answers three separate questions:
+
+- which provider should be used by default
+- which settings are truly global across providers
+- which settings belong to each provider
+
+Current schema:
 
 ```json
 {
-  "provider": "minimax",
-  "defaults": {
-    "voice_id": "clone_voice_can",
-    "speed": 1.2,
-    "model": "speech-2.8-hd",
+  "default_provider": "minimax",
+  "global": {
+    "output_root": "~/Documents/voice-dashboard",
     "format": "mp3",
     "request_timeout_seconds": 60,
     "max_retries": 3,
-    "output_root": "~/Documents/voice-dashboard",
     "open_after_finish": false
   },
   "providers": {
     "minimax": {
+      "voice_id": "clone_voice_can",
+      "speed": 1.2,
+      "model": "speech-2.8-hd",
       "pitch": 0,
       "language_boost": "Chinese,Yue",
       "sample_rate": 32000
     },
-    "elevenlabs": {}
+    "elevenlabs": {
+      "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+      "speed": 1.0,
+      "model": "eleven_multilingual_v2"
+    }
   }
 }
 ```
+
+Meaning of each section:
+
+- `default_provider`: used when CLI does not pass `--provider`
+- `global`: only for settings that make sense regardless of provider
+- `providers.minimax`: MiniMax defaults, including shared-looking fields such as `voice_id`, `model`, and `speed`
+- `providers.elevenlabs`: ElevenLabs defaults, also with its own `voice_id`, `model`, and `speed`
+
+Runtime precedence:
+
+1. CLI flags such as `--provider`, `--voice-id`, `--model`
+2. active provider section in config
+3. `global` config values
+4. built-in defaults
+
+### 6.2 What should go in `global`
+
+Keep only genuinely cross-provider settings in `global`:
+
+- `output_root`
+- `format`
+- `request_timeout_seconds`
+- `max_retries`
+- `open_after_finish`
+
+Do not put these in a shared section:
+
+- `voice_id`
+- `model`
+- `speed`
+
+Those are stored under each provider because they are provider-specific in practice.
+
+### 6.3 MiniMax and ElevenLabs in one config
+
+One config can now hold both providers cleanly:
+
+- MiniMax can keep its own `voice_id`, `model`, `speed`, `pitch`, `language_boost`, `sample_rate`
+- ElevenLabs can keep its own `voice_id`, `model`, `speed`
+
+Example:
+
+```json
+{
+  "default_provider": "minimax",
+  "global": {
+    "output_root": "~/Documents/voice-dashboard",
+    "format": "mp3",
+    "request_timeout_seconds": 60,
+    "max_retries": 3,
+    "open_after_finish": false
+  },
+  "providers": {
+    "minimax": {
+      "voice_id": "clone_voice_can",
+      "speed": 1.2,
+      "model": "speech-2.8-hd",
+      "pitch": 0,
+      "language_boost": "Chinese,Yue",
+      "sample_rate": 32000
+    },
+    "elevenlabs": {
+      "voice_id": "JBFqnCBsd6RMkjVDRZzb",
+      "speed": 1.0,
+      "model": "eleven_multilingual_v2"
+    }
+  }
+}
+```
+
+With that config:
+
+- `ttsrun input.txt` uses MiniMax by default
+- `ttsrun --provider elevenlabs input.txt` switches to the ElevenLabs section
+- `ttsrun --provider elevenlabs --voice-id custom123 input.txt` overrides only the current run
+
+### 6.4 API keys are not stored in config
+
+Do not put secrets in the JSON file.
+
+Use environment variables instead:
+
+```bash
+export MINIMAX_API_KEY="your_minimax_key"
+export ELEVENLABS_API_KEY="your_elevenlabs_key"
+```
+
+`ttsrun` only checks the key for the active provider.
+
+### 6.5 Using a custom config path
 
 Use a custom config path:
 
@@ -267,7 +371,7 @@ Use a custom config path:
 ttsrun examples/sample.txt --config /path/to/config.json
 ```
 
-### 6.1 Provider Notes
+### 6.6 Provider Notes
 
 - `ttsrun` is TTS-only. It expects an existing `voice_id`.
 - `--provider minimax` supports MiniMax-specific controls such as `--pitch`, `--language-boost`, and `--sample-rate`.
@@ -374,3 +478,5 @@ Open output folder after completion:
 ```bash
 pbpaste | ttsrun --stdin --merge --open
 ```
+
+For release-style manual verification, use [docs/MANUAL_USABILITY_CHECKLIST.md](/Users/liang/Downloads/repository/voice-dashboard/docs/MANUAL_USABILITY_CHECKLIST.md).

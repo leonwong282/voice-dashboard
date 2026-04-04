@@ -170,9 +170,11 @@ class InstalledCLITests(unittest.TestCase):
             legacy_path.write_text(
                 json.dumps(
                     {
-                        "defaults": {
-                            "voice_id": "legacy-voice",
-                        }
+                        "providers": {
+                            "minimax": {
+                                "voice_id": "legacy-voice",
+                            }
+                        },
                     },
                     ensure_ascii=False,
                 ),
@@ -184,7 +186,7 @@ class InstalledCLITests(unittest.TestCase):
         self.assertEqual(result.returncode, ExitCode.OK, result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["config_path"], str(legacy_path))
-        self.assertEqual(payload["defaults"]["voice_id"], "legacy-voice")
+        self.assertEqual(payload["providers"]["minimax"]["voice_id"], "legacy-voice")
         self.assertTrue(payload["config_exists"])
 
     def test_installed_config_init_writes_default_config_file(self):
@@ -217,10 +219,14 @@ class InstalledCLITests(unittest.TestCase):
             config_path.write_text(
                 json.dumps(
                     {
-                        "defaults": {
-                            "voice_id": "cfg-voice",
+                        "global": {
                             "output_root": str(home_dir / "tts-output"),
-                        }
+                        },
+                        "providers": {
+                            "minimax": {
+                                "voice_id": "cfg-voice",
+                            }
+                        },
                     },
                     ensure_ascii=False,
                 ),
@@ -238,7 +244,7 @@ class InstalledCLITests(unittest.TestCase):
 
         self.assertEqual(result.returncode, ExitCode.OK, result.stderr)
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["defaults"]["voice_id"], "cfg-voice")
+        self.assertEqual(payload["providers"]["minimax"]["voice_id"], "cfg-voice")
         self.assertEqual(payload["config_path"], str(config_path))
         self.assertTrue(payload["config_exists"])
 

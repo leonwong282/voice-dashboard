@@ -1,7 +1,7 @@
 class VoiceDashboard < Formula
   include Language::Python::Virtualenv
 
-  desc "Daily-friendly MiniMax batch TTS CLI"
+  desc "Daily-friendly batch TTS CLI for MiniMax and ElevenLabs"
   homepage "https://github.com/leonwong282/voice-dashboard"
   url "__SOURCE_TARBALL_URL__"
   sha256 "__SOURCE_TARBALL_SHA256__"
