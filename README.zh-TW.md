@@ -123,7 +123,6 @@ ttsrun config init
 - 發布指南（英文）：[docs/RELEASING.md](docs/RELEASING.md)
 - 發布 checklist（英文）：[docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)
 - 相容性與支援邊界（英文）：[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)
-- 產品化路線圖：[docs/ROADMAP.md](docs/ROADMAP.md)
 
 <p align="right">(<a href="#readme-top">回到頂部</a>)</p>
 

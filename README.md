@@ -123,7 +123,6 @@ ttsrun config init
 - Release guide: [docs/RELEASING.md](docs/RELEASING.md)
 - Release checklist: [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)
 - Compatibility and support policy: [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)
-- Product roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
