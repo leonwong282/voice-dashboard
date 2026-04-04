@@ -16,6 +16,9 @@ This document explains how to use `ttsrun` in this repository for daily batch TT
   - `--quiet`
   - `--verbose`
   - `--json-summary`
+- Runtime request controls:
+  - `--request-timeout`
+  - `--max-retries`
 - Output artifacts: `manifest.json` and `errors.jsonl`
 - Config file support for persistent defaults
 
@@ -138,6 +141,16 @@ ttsrun examples/sample.txt --json-summary
 
 This prints the final manifest summary JSON to stdout. Progress output stays on stderr so the JSON can be piped safely.
 
+### 4.6 Tune request timeout and retry boundaries
+
+```bash
+ttsrun examples/sample.txt --request-timeout 90 --max-retries 5
+```
+
+- `--request-timeout` controls the HTTP timeout for each MiniMax request attempt.
+- `--max-retries` controls the total number of attempts per segment, including the first request.
+- The same defaults can be persisted in config with `request_timeout_seconds` and `max_retries`.
+
 ## 5. Output Rules
 
 ### 5.1 Default output directory
@@ -158,7 +171,14 @@ Where:
 ttsrun examples/sample.txt --output-dir outputs/demo
 ```
 
-### 5.3 Generated files
+- If `outputs/demo` already exists and is not empty, `ttsrun` stops with an input error by default.
+- Use `--force-output-dir` only when you intentionally want to reuse that directory and allow generated files such as `0001.mp3`, `manifest.json`, or `merged.mp3` to be overwritten.
+
+### 5.3 Automatic output-directory collision handling
+
+If an auto-generated timestamped directory already exists, `ttsrun` creates a suffixed directory such as `20260404-173000-job-2` instead of mixing outputs from two runs.
+
+### 5.4 Generated files
 
 Each run generates at least:
 
@@ -212,6 +232,8 @@ You can save and customize output in the resolved config path, for example:
     "model": "speech-2.8-hd",
     "sample_rate": 32000,
     "format": "mp3",
+    "request_timeout_seconds": 60,
+    "max_retries": 3,
     "output_root": "~/Documents/voice-dashboard",
     "open_after_finish": false
   }
@@ -232,6 +254,7 @@ ttsrun examples/sample.txt --config /path/to/config.json
   - `ttsrun --clipboard`
 - Output control:
   - `--output-dir <dir>`
+  - `--force-output-dir`
   - `--output-root <dir>`
   - `--name <job-name>`
 - Voice parameters:
@@ -242,6 +265,8 @@ ttsrun examples/sample.txt --config /path/to/config.json
   - `--model`
   - `--sample-rate`
   - `--format mp3`
+  - `--request-timeout <seconds>`
+  - `--max-retries <count>`
 - Workflow switches:
   - `--merge`
   - `--open`
@@ -276,6 +301,7 @@ ttsrun examples/sample.txt --config /path/to/config.json
 - In `--merge` mode:
   - Missing `ffmpeg`, merge failure, or cleanup failure leads to non-zero exit.
   - On merge failure, segment files are preserved for troubleshooting.
+  - On cleanup failure after a successful merge, generated segments are either restored in place or preserved in a hidden cleanup backup directory reported in the manifest summary.
 
 ## 9. Environment Checks
 
@@ -295,7 +321,7 @@ ttsrun doctor
   - `--json-summary`
 - stderr is used for progress lines, warnings, and errors during batch execution.
 - `--quiet` suppresses progress output while still allowing warnings and errors.
-- `--verbose` adds extra detail such as resolved settings and retry notices.
+- `--verbose` adds extra detail such as resolved voice settings, request timeout/retry settings, and retry notices.
 
 ## 11. Recommended Daily Commands
 

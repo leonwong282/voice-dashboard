@@ -26,16 +26,16 @@ This checklist turns Milestone P3 in `docs/ROADMAP.md` into concrete execution i
 
 ## 2. Operational Hardening
 
-- Review and document request retry boundaries.
-- Review and document timeout behavior.
-- Make overwrite rules explicit for existing output directories.
-- Ensure merge cleanup never removes artifacts after a partial failure.
+- Done: request retry boundaries are now configurable and documented through `--max-retries` / `max_retries`.
+- Done: timeout behavior is now configurable and documented through `--request-timeout` / `request_timeout_seconds`.
+- Done: overwrite rules are explicit for existing output directories; non-empty `--output-dir` now requires `--force-output-dir`.
+- Done: merge cleanup now preserves artifacts safely by restoring segment files or keeping a backup directory when cleanup cannot finish.
 - Verify exit codes remain stable for:
-  - input errors
-  - config errors
-  - auth errors
-  - dependency errors
-  - API errors
+  - Done: input errors
+  - Done: config errors
+  - Done: auth errors
+  - Done: dependency errors
+  - Done: API errors
 
 ## 3. Maintainer Docs
 

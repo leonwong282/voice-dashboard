@@ -196,7 +196,7 @@ Suggested release label:
 
 ### Milestone P3: Reliability, Supportability, And v1.0 Readiness
 
-Status: planned on 2026-04-04.
+Status: in progress on 2026-04-04.
 
 Target outcome: the project is credible as a maintained CLI product.
 

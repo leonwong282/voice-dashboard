@@ -30,12 +30,14 @@ from voice_dashboard.input_sources import (
 )
 from voice_dashboard.pipeline import (
     ProgressReporter,
+    RequestSettings,
     TTSSettings,
     build_output_dir,
     detect_output_dir_opener,
     find_ffmpeg_path,
     get_api_key,
     open_output_dir,
+    prepare_output_dir,
     run_batch_job,
 )
 
@@ -67,6 +69,17 @@ def parse_pitch(value: str) -> int:
         raise argparse.ArgumentTypeError(
             "pitch must be an integer, for example 0, 1, or -1."
         ) from exc
+
+
+def parse_positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("value must be a positive integer.") from exc
+
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("value must be a positive integer.")
+    return parsed
 
 
 def add_config_option(parser: argparse.ArgumentParser) -> None:
@@ -120,7 +133,12 @@ def add_run_options(parser: argparse.ArgumentParser) -> None:
 
     parser.add_argument(
         "--output-dir",
-        help="Write results into this exact directory.",
+        help="Write results into this exact directory. Existing non-empty directories require --force-output-dir.",
+    )
+    parser.add_argument(
+        "--force-output-dir",
+        action="store_true",
+        help="Allow writing into an existing non-empty --output-dir. Existing generated files may be overwritten.",
     )
     parser.add_argument(
         "--output-root",
@@ -140,6 +158,16 @@ def add_run_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--language-boost", help="language_boost payload value.")
     parser.add_argument("--model", help="MiniMax model name.")
     parser.add_argument("--sample-rate", type=int, help="Output audio sample rate.")
+    parser.add_argument(
+        "--request-timeout",
+        type=parse_positive_int,
+        help="HTTP request timeout in seconds for each MiniMax attempt.",
+    )
+    parser.add_argument(
+        "--max-retries",
+        type=parse_positive_int,
+        help="Maximum MiniMax request attempts per segment, including the first attempt.",
+    )
     parser.add_argument(
         "--format",
         choices=[DEFAULT_FORMAT],
@@ -254,6 +282,22 @@ def resolve_settings(args: argparse.Namespace, config: AppConfig) -> TTSSettings
             args.sample_rate if args.sample_rate is not None else config.sample_rate
         ),
         audio_format=args.format or config.audio_format,
+    )
+
+
+def resolve_request_settings(
+    args: argparse.Namespace,
+    config: AppConfig,
+) -> RequestSettings:
+    return RequestSettings(
+        timeout_seconds=(
+            args.request_timeout
+            if args.request_timeout is not None
+            else config.request_timeout_seconds
+        ),
+        max_retries=(
+            args.max_retries if args.max_retries is not None else config.max_retries
+        ),
     )
 
 
@@ -451,6 +495,9 @@ def run_batch_command(
     parser = build_run_parser(prog=prog, show_commands=show_commands)
     args = parser.parse_args(argv)
 
+    if args.force_output_dir and not args.output_dir:
+        parser.error("--force-output-dir can only be used with --output-dir.")
+
     command_result = handle_legacy_management_command(parser, args)
     if command_result is not None:
         return int(command_result)
@@ -458,19 +505,26 @@ def run_batch_command(
     config = load_config(args.config)
     source = resolve_input_source(parser, args)
     settings = resolve_settings(args, config)
+    request_settings = resolve_request_settings(args, config)
     output_root = (
         Path(args.output_root).expanduser() if args.output_root else config.output_root
     )
-    output_dir = build_output_dir(
+    candidate_output_dir = build_output_dir(
         source=source,
         output_root=output_root,
         explicit_output_dir=args.output_dir,
         job_name=args.name,
     )
+    output_dir = prepare_output_dir(
+        candidate_output_dir,
+        explicit=bool(args.output_dir),
+        overwrite=args.force_output_dir,
+    )
     result = run_batch_job(
         source=source,
         output_dir=output_dir,
         settings=settings,
+        request_settings=request_settings,
         api_key=get_api_key(),
         merge=args.merge,
         reporter=build_reporter(args),

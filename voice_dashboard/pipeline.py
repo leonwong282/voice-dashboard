@@ -23,6 +23,7 @@ from voice_dashboard.errors import (
     AuthenticationError,
     DependencyError,
     ExitCode,
+    InputSourceError,
     RetryableApiError,
     TTSBatchError,
     exit_code_for_error,
@@ -46,6 +47,19 @@ class BatchResult:
     exit_code: int
     output_dir: Path
     manifest: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class RequestSettings:
+    timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
+    max_retries: int = DEFAULT_MAX_RETRIES
+
+
+@dataclass(frozen=True)
+class CleanupResult:
+    deleted_count: int
+    error: str | None = None
+    backup_dir: Path | None = None
 
 
 @dataclass
@@ -126,10 +140,10 @@ def synthesize_segment(
     text: str,
     settings: TTSSettings,
     api_key: str,
-    timeout: int = DEFAULT_TIMEOUT_SECONDS,
-    max_retries: int = DEFAULT_MAX_RETRIES,
+    request_settings: RequestSettings | None = None,
     reporter: ProgressReporter | None = None,
 ) -> bytes:
+    request_settings = request_settings or RequestSettings()
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -150,14 +164,14 @@ def synthesize_segment(
     }
 
     last_error: ApiError | None = None
-    for attempt in range(1, max_retries + 1):
+    for attempt in range(1, request_settings.max_retries + 1):
         retryable = False
         try:
             response = requests.post(
                 API_URL,
                 headers=headers,
                 json=payload,
-                timeout=timeout,
+                timeout=request_settings.timeout_seconds,
             )
         except requests.RequestException as exc:
             last_error = RetryableApiError(f"Network error: {exc}")
@@ -197,10 +211,11 @@ def synthesize_segment(
 
                 return decode_audio_hex(audio_hex)
 
-        if retryable and attempt < max_retries:
+        if retryable and attempt < request_settings.max_retries:
             if reporter is not None:
                 reporter.detail(
-                    f"Retrying after API failure ({attempt}/{max_retries}): {last_error}"
+                    "Retrying after API failure "
+                    f"({attempt}/{request_settings.max_retries}): {last_error}"
                 )
             time.sleep(attempt)
             continue
@@ -299,18 +314,78 @@ def merge_audio_files(output_dir: Path, audio_files: list[Path]) -> Path:
     return merged_output_path
 
 
-def delete_segment_files(audio_files: list[Path]) -> tuple[int, list[str]]:
-    deleted_count = 0
-    cleanup_errors: list[str] = []
-    for audio_file in audio_files:
+def _build_cleanup_failure(
+    backup_dir: Path,
+    errors: list[str],
+) -> CleanupResult:
+    backup_path: Path | None = None
+    if backup_dir.exists():
         try:
-            audio_file.unlink()
-            deleted_count += 1
-        except FileNotFoundError:
-            cleanup_errors.append(f"Missing segment during cleanup: {audio_file.name}")
+            has_contents = any(backup_dir.iterdir())
+        except OSError:
+            has_contents = True
+        if has_contents:
+            backup_path = backup_dir
+            errors.append(f"Segment backups were preserved at {backup_dir}")
+        else:
+            backup_dir.rmdir()
+    return CleanupResult(
+        deleted_count=0,
+        error="; ".join(errors),
+        backup_dir=backup_path,
+    )
+
+
+def _restore_segment_backups(
+    moved_files: list[tuple[Path, Path]],
+) -> list[str]:
+    restore_errors: list[str] = []
+    for original_path, backup_path in reversed(moved_files):
+        if not backup_path.exists():
+            continue
+        try:
+            shutil.move(str(backup_path), str(original_path))
         except OSError as exc:
-            cleanup_errors.append(f"Failed to delete {audio_file.name}: {exc}")
-    return deleted_count, cleanup_errors
+            restore_errors.append(
+                f"Failed to restore {original_path.name} from cleanup backup: {exc}"
+            )
+    return restore_errors
+
+
+def cleanup_merged_segments(output_dir: Path, audio_files: list[Path]) -> CleanupResult:
+    if not audio_files:
+        return CleanupResult(deleted_count=0)
+
+    backup_dir = Path(
+        tempfile.mkdtemp(prefix=".merge-cleanup-", dir=output_dir)
+    )
+    moved_files: list[tuple[Path, Path]] = []
+
+    for audio_file in audio_files:
+        if not audio_file.exists():
+            errors = [f"Missing segment during cleanup: {audio_file.name}"]
+            errors.extend(_restore_segment_backups(moved_files))
+            return _build_cleanup_failure(backup_dir, errors)
+
+        backup_path = backup_dir / audio_file.name
+        try:
+            shutil.move(str(audio_file), str(backup_path))
+        except OSError as exc:
+            errors = [f"Failed to preserve {audio_file.name} during cleanup: {exc}"]
+            errors.extend(_restore_segment_backups(moved_files))
+            return _build_cleanup_failure(backup_dir, errors)
+        moved_files.append((audio_file, backup_path))
+
+    try:
+        shutil.rmtree(backup_dir)
+    except OSError as exc:
+        return CleanupResult(
+            deleted_count=0,
+            error=f"Failed to remove cleanup backup directory: {exc}",
+            backup_dir=backup_dir,
+        )
+
+    return CleanupResult(deleted_count=len(audio_files))
 
 
 def sanitize_label(value: str) -> str:
@@ -332,6 +407,48 @@ def build_output_dir(
     timestamp = now.strftime("%Y%m%d-%H%M%S")
     label = sanitize_label(job_name or source.label or source.kind)
     return output_root.expanduser() / date_part / f"{timestamp}-{label}"
+
+
+def uniquify_output_dir(path: Path) -> Path:
+    candidate = path
+    suffix = 2
+    while candidate.exists():
+        candidate = path.with_name(f"{path.name}-{suffix}")
+        suffix += 1
+    return candidate
+
+
+def prepare_output_dir(
+    output_dir: Path,
+    *,
+    explicit: bool,
+    overwrite: bool,
+) -> Path:
+    resolved_output_dir = output_dir.expanduser()
+    if not resolved_output_dir.exists():
+        return resolved_output_dir
+
+    if explicit:
+        if not resolved_output_dir.is_dir():
+            raise InputSourceError(
+                f"Output path exists and is not a directory: {resolved_output_dir}"
+            )
+
+        try:
+            has_existing_files = any(resolved_output_dir.iterdir())
+        except OSError as exc:
+            raise InputSourceError(
+                f"Failed to inspect output directory: {resolved_output_dir}: {exc}"
+            ) from exc
+
+        if has_existing_files and not overwrite:
+            raise InputSourceError(
+                "Output directory already exists and is not empty: "
+                f"{resolved_output_dir}. Use --force-output-dir to allow overwriting generated files in that directory."
+            )
+        return resolved_output_dir
+
+    return uniquify_output_dir(resolved_output_dir)
 
 
 def detect_output_dir_opener() -> str | None:
@@ -362,11 +479,13 @@ def run_batch_job(
     source: InputSource,
     output_dir: Path,
     settings: TTSSettings,
+    request_settings: RequestSettings | None,
     api_key: str,
     merge: bool,
     reporter: ProgressReporter | None = None,
 ) -> BatchResult:
     reporter = reporter or ProgressReporter()
+    request_settings = request_settings or RequestSettings()
     segments = parse_segments(source.text)
     if not segments:
         raise TTSBatchError("No non-empty segments found in the provided input.")
@@ -377,6 +496,10 @@ def run_batch_job(
     reporter.detail(
         "Settings: "
         + json.dumps(asdict(settings), ensure_ascii=False, sort_keys=True)
+    )
+    reporter.detail(
+        "Request settings: "
+        + json.dumps(asdict(request_settings), ensure_ascii=False, sort_keys=True)
     )
 
     index_width = max(4, len(str(len(segments))))
@@ -397,6 +520,7 @@ def run_batch_job(
                 text,
                 settings,
                 api_key,
+                request_settings=request_settings,
                 reporter=reporter,
             )
         except TTSBatchError as exc:
@@ -433,6 +557,8 @@ def run_batch_job(
     merge_status = "skipped"
     merge_error: str | None = None
     cleanup_status = "skipped"
+    cleanup_error: str | None = None
+    cleanup_backup_dir: str | None = None
     deleted_segment_files = 0
 
     if failure_count == 0 and merge:
@@ -448,13 +574,14 @@ def run_batch_job(
             merge_status = "success"
             merged_output_file = merged_output_path.name
             reporter.info(f"Merge succeeded: {merged_output_path}")
-            deleted_segment_files, cleanup_errors = delete_segment_files(
-                generated_audio_files
-            )
-            if cleanup_errors:
+            cleanup_result = cleanup_merged_segments(output_dir, generated_audio_files)
+            deleted_segment_files = cleanup_result.deleted_count
+            if cleanup_result.error:
                 cleanup_status = "failed"
-                merge_error = "; ".join(cleanup_errors)
-                reporter.error(f"Cleanup failed after merge: {merge_error}")
+                cleanup_error = cleanup_result.error
+                if cleanup_result.backup_dir is not None:
+                    cleanup_backup_dir = str(cleanup_result.backup_dir)
+                reporter.error(f"Cleanup failed after merge: {cleanup_error}")
             else:
                 cleanup_status = "success"
                 reporter.info(
@@ -475,11 +602,15 @@ def run_batch_job(
             "succeeded": success_count,
             "failed": failure_count,
             "output_dir": str(output_dir.resolve()),
+            "request_timeout_seconds": request_settings.timeout_seconds,
+            "max_retries": request_settings.max_retries,
             "merged_output_file": merged_output_file,
             "merge_status": merge_status,
             "deleted_segment_files": deleted_segment_files,
             "cleanup_status": cleanup_status,
             "merge_error": merge_error,
+            "cleanup_error": cleanup_error,
+            "cleanup_backup_dir": cleanup_backup_dir,
         },
         "segments": results,
     }

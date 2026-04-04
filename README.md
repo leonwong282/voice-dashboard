@@ -85,11 +85,13 @@ pbpaste | ttsrun --stdin --merge
 ## ⚙️ Common Options
 
 - `--output-dir <dir>`: write outputs to a fixed directory.
+- `--force-output-dir`: allow reusing a non-empty `--output-dir`.
 - `--output-root <dir>`: set the default output root.
 - `--name <label>`: customize job folder suffix.
 - `--merge`: merge all successful segments and remove segment files.
 - `--open`: open output directory after completion.
 - `--config <path>`: use a specific config file.
+- `--request-timeout <seconds>` / `--max-retries <count>`: tune MiniMax request boundaries.
 - `--version`: print the installed CLI version.
 - `doctor`: inspect config, API key, and optional dependencies.
 - `config path`: print the resolved config path.
@@ -98,6 +100,8 @@ pbpaste | ttsrun --stdin --merge
 - `config init`: write an example config file.
 - `--quiet` / `--verbose`: control progress output on stderr.
 - `--json-summary`: print the final manifest summary as JSON.
+
+If an explicit `--output-dir` already exists and is not empty, `ttsrun` stops by default instead of silently mixing runs. Use `--force-output-dir` only when overwriting generated files is intentional.
 
 Preferred management commands:
 

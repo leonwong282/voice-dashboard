@@ -85,11 +85,13 @@ pbpaste | ttsrun --stdin --merge
 ## ⚙️ 常用參數
 
 - `--output-dir <dir>`：輸出到固定目錄。
+- `--force-output-dir`：允許重用非空的 `--output-dir`。
 - `--output-root <dir>`：設定預設輸出根目錄。
 - `--name <label>`：自訂任務資料夾尾碼。
 - `--merge`：全部成功後合併，並刪除分段檔。
 - `--open`：完成後嘗試打開輸出目錄。
 - `--config <path>`：使用指定設定檔。
+- `--request-timeout <seconds>` / `--max-retries <count>`：調整 MiniMax 請求 timeout 與 retry 邊界。
 - `--version`：輸出目前 CLI 版本。
 - `doctor`：檢查設定檔、API key 與可選依賴。
 - `config path`：輸出實際設定檔路徑。
@@ -98,6 +100,8 @@ pbpaste | ttsrun --stdin --merge
 - `config init`：寫入一份設定檔範例。
 - `--quiet` / `--verbose`：控制 stderr 上的進度輸出。
 - `--json-summary`：以 JSON 輸出最終摘要。
+
+如果指定的 `--output-dir` 已存在且不是空目錄，`ttsrun` 預設會直接停止，避免把兩次執行混在一起。只有在你確定要覆蓋該目錄內產生檔案時，才使用 `--force-output-dir`。
 
 建議優先使用新的管理子命令：
 

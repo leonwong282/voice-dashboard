@@ -6,10 +6,12 @@ from typing import Any
 from voice_dashboard.defaults import (
     DEFAULT_FORMAT,
     DEFAULT_LANGUAGE_BOOST,
+    DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
     DEFAULT_PITCH,
     DEFAULT_SAMPLE_RATE,
     DEFAULT_SPEED,
+    DEFAULT_TIMEOUT_SECONDS,
     DEFAULT_VOICE_ID,
     default_config_path,
     default_output_root,
@@ -27,6 +29,8 @@ class AppConfig:
     model: str = DEFAULT_MODEL
     sample_rate: int = DEFAULT_SAMPLE_RATE
     audio_format: str = DEFAULT_FORMAT
+    request_timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
+    max_retries: int = DEFAULT_MAX_RETRIES
     output_root: Path = field(default_factory=default_output_root)
     open_after_finish: bool = False
     config_path: Path = field(default_factory=default_config_path)
@@ -48,6 +52,13 @@ def _coerce_int(value: Any, field_name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigError(f"Config field '{field_name}' must be an integer.")
     return value
+
+
+def _coerce_positive_int(value: Any, field_name: str) -> int:
+    integer = _coerce_int(value, field_name)
+    if integer < 1:
+        raise ConfigError(f"Config field '{field_name}' must be greater than zero.")
+    return integer
 
 
 def _coerce_bool(value: Any, field_name: str) -> bool:
@@ -146,6 +157,14 @@ def load_config(config_path: str | None) -> AppConfig:
         updates["model"] = _coerce_str(values["model"], "model")
     if "sample_rate" in values:
         updates["sample_rate"] = _coerce_int(values["sample_rate"], "sample_rate")
+    if "request_timeout_seconds" in values:
+        updates["request_timeout_seconds"] = _coerce_positive_int(
+            values["request_timeout_seconds"], "request_timeout_seconds"
+        )
+    if "max_retries" in values:
+        updates["max_retries"] = _coerce_positive_int(
+            values["max_retries"], "max_retries"
+        )
     if "format" in values:
         updates["audio_format"] = _coerce_str(values["format"], "format")
     elif "audio_format" in values:
