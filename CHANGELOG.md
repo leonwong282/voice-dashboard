@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-04-04
+
+### Changed
+- Validation patch release to rerun the full tag-driven PyPI, GitHub Release, and Homebrew automation after the `0.7.0` stabilization release.
+
 ## [0.7.0] - 2026-04-04
 
 ### Added
@@ -98,7 +103,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `README-old.md`
   - `docs/USAGE-old.md`
 
-[Unreleased]: https://github.com/leonwong282/voice-dashboard/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/leonwong282/voice-dashboard/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.7.1
 [0.7.0]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.7.0
 [0.4.5]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.4.5
 [0.4.4]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.4.4

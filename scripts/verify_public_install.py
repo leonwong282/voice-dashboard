@@ -114,7 +114,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--package-spec",
         required=True,
-        help="Package spec to install, for example voice-dashboard==0.7.0 or dist/*.whl.",
+        help="Package spec to install, for example voice-dashboard==0.7.1 or dist/*.whl.",
     )
     parser.add_argument(
         "--python-executable",

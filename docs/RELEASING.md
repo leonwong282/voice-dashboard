@@ -58,8 +58,8 @@ For the exact release-day sequence, use `docs/RELEASE_CHECKLIST.md` as the opera
 Cut and push a version tag:
 
 ```bash
-git tag v0.7.0
-git push origin v0.7.0
+git tag v0.7.1
+git push origin v0.7.1
 ```
 
 The release workflow then:
@@ -111,7 +111,7 @@ rm -rf /tmp/voice-dashboard-release-check
 For a repeatable scripted check, use:
 
 ```bash
-python scripts/verify_public_install.py --package-spec voice-dashboard==0.7.0
+python scripts/verify_public_install.py --package-spec voice-dashboard==0.7.1
 ```
 
 The same verification now runs automatically in the tag-driven release workflow after PyPI publication succeeds.
@@ -142,7 +142,7 @@ make dist-sha256
 To render a concrete formula body from the published source tarball:
 
 ```bash
-python scripts/render_homebrew_formula.py --package-version 0.7.0
+python scripts/render_homebrew_formula.py --package-version 0.7.1
 ```
 
 The release workflow now also pushes that rendered formula directly into the shared tap, so the GitHub Release attachment is mainly useful for inspection and troubleshooting.

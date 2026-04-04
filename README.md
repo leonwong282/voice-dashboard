@@ -6,7 +6,7 @@
 
 > A practical MiniMax batch Text-to-Speech CLI for daily workflows.
 
-![Version](https://img.shields.io/badge/Version-0.7.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.7.1-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL--3.0-red?style=for-the-badge)
 ![CLI](https://img.shields.io/badge/CLI-ttsrun-green?style=for-the-badge)
