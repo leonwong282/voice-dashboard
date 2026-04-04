@@ -25,4 +25,6 @@ jobs:
       - name: Verify published install paths
         run: |
           python scripts/verify_public_install.py \
-            --package-spec "${{ inputs.package_spec }}"
+            --package-spec "${{ inputs.package_spec }}" \
+            --attempts 10 \
+            --retry-delay-seconds 15

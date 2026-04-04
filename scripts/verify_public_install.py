@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -69,6 +70,43 @@ def verify_with_pipx(package_spec: str, python_executable: str) -> None:
         verify_ttsrun(pipx_bin_dir / "ttsrun")
 
 
+def verify_with_retries(
+    *,
+    package_spec: str,
+    python_executable: str,
+    skip_pip: bool,
+    skip_pipx: bool,
+    attempts: int,
+    retry_delay_seconds: int,
+) -> None:
+    last_error: subprocess.CalledProcessError | None = None
+
+    for attempt in range(1, attempts + 1):
+        try:
+            if not skip_pip:
+                print(f"Verifying pip install path for {package_spec} (attempt {attempt}/{attempts})")
+                verify_with_pip(package_spec, python_executable)
+
+            if not skip_pipx:
+                print(f"Verifying pipx install path for {package_spec} (attempt {attempt}/{attempts})")
+                verify_with_pipx(package_spec, python_executable)
+
+            return
+        except subprocess.CalledProcessError as exc:
+            last_error = exc
+            if attempt == attempts:
+                break
+            print(
+                f"Install verification attempt {attempt}/{attempts} failed with exit code {exc.returncode}. "
+                f"Retrying in {retry_delay_seconds}s...",
+                file=sys.stderr,
+            )
+            time.sleep(retry_delay_seconds)
+
+    if last_error is not None:
+        raise last_error
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Verify that a published package spec installs and runs via pip and pipx."
@@ -93,6 +131,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Skip plain pip verification.",
     )
+    parser.add_argument(
+        "--attempts",
+        type=int,
+        default=1,
+        help="Number of verification attempts before failing. Useful for waiting on package index propagation.",
+    )
+    parser.add_argument(
+        "--retry-delay-seconds",
+        type=int,
+        default=15,
+        help="Delay between verification attempts when retries are enabled.",
+    )
     return parser.parse_args(argv)
 
 
@@ -108,13 +158,14 @@ def main(argv: list[str] | None = None) -> int:
     elif Path(package_spec).exists():
         package_spec = str(Path(package_spec).resolve())
 
-    if not args.skip_pip:
-        print(f"Verifying pip install path for {package_spec}")
-        verify_with_pip(package_spec, args.python_executable)
-
-    if not args.skip_pipx:
-        print(f"Verifying pipx install path for {package_spec}")
-        verify_with_pipx(package_spec, args.python_executable)
+    verify_with_retries(
+        package_spec=package_spec,
+        python_executable=args.python_executable,
+        skip_pip=args.skip_pip,
+        skip_pipx=args.skip_pipx,
+        attempts=args.attempts,
+        retry_delay_seconds=args.retry_delay_seconds,
+    )
 
     print("Public install verification completed successfully.")
     return 0
