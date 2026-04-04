@@ -39,7 +39,7 @@ jobs:
         run: make check release-smoke
 
       - name: Upload distribution artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dist
           path: dist/*
@@ -49,7 +49,7 @@ jobs:
         run: sha256sum dist/* > dist/SHA256SUMS.txt
 
       - name: Upload checksum artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: checksums
           path: dist/SHA256SUMS.txt
@@ -101,7 +101,7 @@ jobs:
             --output release-assets/voice-dashboard.rb
 
       - name: Upload Homebrew formula artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: homebrew-formula
           path: release-assets/voice-dashboard.rb
@@ -127,7 +127,7 @@ jobs:
           fi
 
       - name: Download Homebrew formula artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: homebrew-formula
           path: release-assets
@@ -209,19 +209,19 @@ jobs:
 
     steps:
       - name: Download distribution artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
 
       - name: Download checksum artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: checksums
           path: release-assets
 
       - name: Download Homebrew formula artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: homebrew-formula
           path: release-assets
@@ -248,7 +248,7 @@ jobs:
 
     steps:
       - name: Download distribution artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist

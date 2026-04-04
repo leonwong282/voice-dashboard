@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Upgraded GitHub Actions artifact steps to `actions/upload-artifact@v6` and `actions/download-artifact@v8` to remove the remaining Node 20 deprecation warnings from the release pipeline.
+
 ## [0.7.1] - 2026-04-04
 
 ### Changed
