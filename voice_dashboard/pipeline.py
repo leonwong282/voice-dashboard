@@ -387,6 +387,7 @@ def run_batch_job(
     api_key: str,
     merge: bool,
     reporter: ProgressReporter | None = None,
+    provider_name: str = DEFAULT_PROVIDER_NAME,
 ) -> BatchResult:
     reporter = reporter or ProgressReporter()
     request_settings = request_settings or RequestSettings()
@@ -426,6 +427,7 @@ def run_batch_job(
                 api_key,
                 request_settings=request_settings,
                 reporter=reporter,
+                provider_name=provider_name,
             )
         except TTSBatchError as exc:
             failure_count += 1

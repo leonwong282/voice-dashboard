@@ -40,6 +40,10 @@ from voice_dashboard.pipeline import (
     prepare_output_dir,
     run_batch_job,
 )
+from voice_dashboard.providers.registry import (
+    DEFAULT_PROVIDER_NAME,
+    SUPPORTED_PROVIDER_NAMES,
+)
 
 
 COMMAND_EPILOG = """Management commands:
@@ -88,6 +92,11 @@ def add_config_option(parser: argparse.ArgumentParser) -> None:
 
 def add_run_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("input_path", nargs="?", help="Path to a UTF-8 text file.")
+    parser.add_argument(
+        "--provider",
+        choices=SUPPORTED_PROVIDER_NAMES,
+        help=f"TTS provider to use. Defaults to {DEFAULT_PROVIDER_NAME}.",
+    )
     parser.add_argument(
         "--stdin",
         action="store_true",
@@ -148,7 +157,7 @@ def add_run_options(parser: argparse.ArgumentParser) -> None:
         "--name",
         help="Custom label used in the generated output folder name.",
     )
-    parser.add_argument("--voice-id", help="MiniMax voice ID.")
+    parser.add_argument("--voice-id", help="Voice ID for the active provider.")
     parser.add_argument("--speed", type=float, help="Voice speed multiplier.")
     parser.add_argument(
         "--pitch",
@@ -222,6 +231,11 @@ def build_doctor_parser() -> argparse.ArgumentParser:
         description="Check environment, config, and optional dependencies.",
     )
     add_config_option(parser)
+    parser.add_argument(
+        "--provider",
+        choices=SUPPORTED_PROVIDER_NAMES,
+        help="Override the configured provider for doctor checks.",
+    )
     return parser
 
 
@@ -269,6 +283,10 @@ def resolve_open_after_finish(args: argparse.Namespace, config: AppConfig) -> bo
     if args.open is not None:
         return args.open
     return config.open_after_finish
+
+
+def resolve_provider(args: argparse.Namespace, config: AppConfig) -> str:
+    return args.provider or config.provider or DEFAULT_PROVIDER_NAME
 
 
 def resolve_settings(args: argparse.Namespace, config: AppConfig) -> TTSSettings:
@@ -345,9 +363,10 @@ def build_reporter(args: argparse.Namespace) -> ProgressReporter:
     )
 
 
-def run_doctor(config_path: str | None) -> int:
+def run_doctor(config_path: str | None, provider_override: str | None = None) -> int:
     exit_code = ExitCode.OK
     resolved_config_path = resolve_config_path(config_path)
+    resolved_provider = DEFAULT_PROVIDER_NAME
 
     print(f"voice-dashboard {__version__}")
     print(f"python: {sys.version.split()[0]}")
@@ -362,20 +381,33 @@ def run_doctor(config_path: str | None) -> int:
                 exit_code = ExitCode.CONFIG
         else:
             print_doctor_check("ok", "config file", "loaded successfully")
+            resolved_provider = provider_override or load_config(str(resolved_config_path)).provider
     else:
         print_doctor_check(
             "warn",
             "config file",
             "not found; defaults will be used until you run `ttsrun config init`",
         )
+        if provider_override:
+            resolved_provider = provider_override
 
-    api_key = os.getenv("MINIMAX_API_KEY", "").strip()
+    if provider_override and resolved_config_path.exists():
+        resolved_provider = provider_override
+
+    print_doctor_check("ok", "provider", resolved_provider)
+
+    api_key_label = (
+        "MINIMAX_API_KEY"
+        if resolved_provider == "minimax"
+        else "ELEVENLABS_API_KEY"
+    )
+    api_key = os.getenv(api_key_label, "").strip()
     if api_key:
-        print_doctor_check("ok", "MINIMAX_API_KEY", f"set ({len(api_key)} chars)")
+        print_doctor_check("ok", api_key_label, f"set ({len(api_key)} chars)")
     else:
         print_doctor_check(
             "fail",
-            "MINIMAX_API_KEY",
+            api_key_label,
             "not set; export it before running ttsrun",
         )
         if exit_code == ExitCode.OK:
@@ -444,7 +476,7 @@ def handle_legacy_management_command(
 
     if args.doctor:
         print_legacy_flag_warning("--doctor")
-        return run_doctor(args.config)
+        return run_doctor(args.config, provider_override=args.provider)
 
     return None
 
@@ -484,7 +516,7 @@ def run_config_command(argv: list[str]) -> int:
 def run_doctor_command(argv: list[str]) -> int:
     parser = build_doctor_parser()
     args = parser.parse_args(argv)
-    return run_doctor(args.config)
+    return run_doctor(args.config, provider_override=args.provider)
 
 
 def run_batch_command(
@@ -503,6 +535,7 @@ def run_batch_command(
         return int(command_result)
 
     config = load_config(args.config)
+    provider_name = resolve_provider(args, config)
     source = resolve_input_source(parser, args)
     settings = resolve_settings(args, config)
     request_settings = resolve_request_settings(args, config)
@@ -525,9 +558,10 @@ def run_batch_command(
         output_dir=output_dir,
         settings=settings,
         request_settings=request_settings,
-        api_key=get_api_key(),
+        api_key=get_api_key(provider_name),
         merge=args.merge,
         reporter=build_reporter(args),
+        provider_name=provider_name,
     )
     if args.json_summary:
         print(json.dumps(result.manifest["summary"], ensure_ascii=False))

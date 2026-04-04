@@ -125,6 +125,24 @@ class InstalledCLITests(unittest.TestCase):
         self.assertIn("MINIMAX_API_KEY", result.stdout)
         self.assertEqual(result.stderr, "")
 
+    def test_installed_doctor_supports_provider_override(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            home_dir = Path(temp_dir) / "home"
+            home_dir.mkdir()
+
+            result = self.run_ttsrun(
+                "doctor",
+                "--provider",
+                "elevenlabs",
+                env_overrides={"HOME": str(home_dir)},
+            )
+
+        self.assertEqual(result.returncode, ExitCode.AUTH)
+        self.assertIn("provider", result.stdout)
+        self.assertIn("elevenlabs", result.stdout)
+        self.assertIn("ELEVENLABS_API_KEY", result.stdout)
+        self.assertEqual(result.stderr, "")
+
     def test_installed_config_path_uses_default_xdg_location(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             home_dir = Path(temp_dir) / "home"

@@ -18,22 +18,44 @@ from voice_dashboard.defaults import (
     legacy_config_path,
 )
 from voice_dashboard.errors import ConfigError
+from voice_dashboard.providers.registry import (
+    DEFAULT_PROVIDER_NAME,
+    SUPPORTED_PROVIDER_NAMES,
+)
+
+
+@dataclass(frozen=True)
+class MiniMaxConfig:
+    pitch: int = DEFAULT_PITCH
+    language_boost: str = DEFAULT_LANGUAGE_BOOST
+    sample_rate: int = DEFAULT_SAMPLE_RATE
 
 
 @dataclass(frozen=True)
 class AppConfig:
+    provider: str = DEFAULT_PROVIDER_NAME
     voice_id: str = DEFAULT_VOICE_ID
     speed: float = DEFAULT_SPEED
-    pitch: int = DEFAULT_PITCH
-    language_boost: str = DEFAULT_LANGUAGE_BOOST
     model: str = DEFAULT_MODEL
-    sample_rate: int = DEFAULT_SAMPLE_RATE
     audio_format: str = DEFAULT_FORMAT
     request_timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
     max_retries: int = DEFAULT_MAX_RETRIES
     output_root: Path = field(default_factory=default_output_root)
     open_after_finish: bool = False
+    minimax: MiniMaxConfig = field(default_factory=MiniMaxConfig)
     config_path: Path = field(default_factory=default_config_path)
+
+    @property
+    def pitch(self) -> int:
+        return self.minimax.pitch
+
+    @property
+    def language_boost(self) -> str:
+        return self.minimax.language_boost
+
+    @property
+    def sample_rate(self) -> int:
+        return self.minimax.sample_rate
 
 
 def _coerce_str(value: Any, field_name: str) -> str:
@@ -67,6 +89,16 @@ def _coerce_bool(value: Any, field_name: str) -> bool:
     return value
 
 
+def _coerce_provider(value: Any, field_name: str = "provider") -> str:
+    provider = _coerce_str(value, field_name)
+    if provider not in SUPPORTED_PROVIDER_NAMES:
+        supported = ", ".join(SUPPORTED_PROVIDER_NAMES)
+        raise ConfigError(
+            f"Config field '{field_name}' must be one of: {supported}."
+        )
+    return provider
+
+
 def example_config() -> dict[str, Any]:
     return serialize_config(AppConfig())
 
@@ -75,12 +107,30 @@ def serialize_config(
     config: AppConfig,
     include_metadata: bool = False,
 ) -> dict[str, Any]:
-    data = asdict(config)
-    data["output_root"] = str(config.output_root)
-    data["format"] = data.pop("audio_format")
-    data.pop("config_path", None)
+    defaults = {
+        "voice_id": config.voice_id,
+        "speed": config.speed,
+        "model": config.model,
+        "output_root": str(config.output_root),
+        "format": config.audio_format,
+        "request_timeout_seconds": config.request_timeout_seconds,
+        "max_retries": config.max_retries,
+        "open_after_finish": config.open_after_finish,
+    }
+    providers = {
+        "minimax": {
+            "pitch": config.pitch,
+            "language_boost": config.language_boost,
+            "sample_rate": config.sample_rate,
+        },
+        "elevenlabs": {},
+    }
 
-    payload: dict[str, Any] = {"defaults": data}
+    payload: dict[str, Any] = {
+        "provider": config.provider,
+        "defaults": defaults,
+        "providers": providers,
+    }
     if include_metadata:
         preferred_config_path = default_config_path()
         legacy_path = legacy_config_path()
@@ -136,27 +186,37 @@ def load_config(config_path: str | None) -> AppConfig:
     if not isinstance(payload, dict):
         raise ConfigError(f"Config file must contain a JSON object: {resolved_path}")
 
+    provider_values = payload.get("providers", {})
+    if provider_values and not isinstance(provider_values, dict):
+        raise ConfigError("Config key 'providers' must be a JSON object.")
+
     values = payload.get("defaults", payload)
     if not isinstance(values, dict):
         raise ConfigError("Config key 'defaults' must be a JSON object.")
 
     config = AppConfig(config_path=resolved_path)
     updates: dict[str, Any] = {}
+    minimax_updates: dict[str, Any] = {}
+
+    if "provider" in payload:
+        updates["provider"] = _coerce_provider(payload["provider"])
 
     if "voice_id" in values:
         updates["voice_id"] = _coerce_str(values["voice_id"], "voice_id")
     if "speed" in values:
         updates["speed"] = _coerce_float(values["speed"], "speed")
     if "pitch" in values:
-        updates["pitch"] = _coerce_int(values["pitch"], "pitch")
+        minimax_updates["pitch"] = _coerce_int(values["pitch"], "pitch")
     if "language_boost" in values:
-        updates["language_boost"] = _coerce_str(
+        minimax_updates["language_boost"] = _coerce_str(
             values["language_boost"], "language_boost"
         )
     if "model" in values:
         updates["model"] = _coerce_str(values["model"], "model")
     if "sample_rate" in values:
-        updates["sample_rate"] = _coerce_int(values["sample_rate"], "sample_rate")
+        minimax_updates["sample_rate"] = _coerce_int(
+            values["sample_rate"], "sample_rate"
+        )
     if "request_timeout_seconds" in values:
         updates["request_timeout_seconds"] = _coerce_positive_int(
             values["request_timeout_seconds"], "request_timeout_seconds"
@@ -180,4 +240,22 @@ def load_config(config_path: str | None) -> AppConfig:
             values["open_after_finish"], "open_after_finish"
         )
 
-    return AppConfig(**{**asdict(config), **updates})
+    minimax_values = provider_values.get("minimax", {})
+    if minimax_values and not isinstance(minimax_values, dict):
+        raise ConfigError("Config key 'providers.minimax' must be a JSON object.")
+
+    if "pitch" in minimax_values:
+        minimax_updates["pitch"] = _coerce_int(minimax_values["pitch"], "pitch")
+    if "language_boost" in minimax_values:
+        minimax_updates["language_boost"] = _coerce_str(
+            minimax_values["language_boost"], "language_boost"
+        )
+    if "sample_rate" in minimax_values:
+        minimax_updates["sample_rate"] = _coerce_int(
+            minimax_values["sample_rate"], "sample_rate"
+        )
+
+    merged = asdict(config)
+    merged.update(updates)
+    merged["minimax"] = MiniMaxConfig(**{**asdict(config.minimax), **minimax_updates})
+    return AppConfig(**merged)

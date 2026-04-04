@@ -63,7 +63,9 @@ class CLITests(unittest.TestCase):
 
         self.assertEqual(exit_code, ExitCode.OK)
         payload = json.loads(stdout_buffer.getvalue())
+        self.assertEqual(payload["provider"], "minimax")
         self.assertIn("defaults", payload)
+        self.assertIn("providers", payload)
         self.assertIn("voice_id", payload["defaults"])
         self.assertIn("output_root", payload["defaults"])
         self.assertIn("format", payload["defaults"])
@@ -77,7 +79,9 @@ class CLITests(unittest.TestCase):
 
         self.assertEqual(exit_code, ExitCode.OK)
         payload = json.loads(buffer.getvalue())
+        self.assertEqual(payload["provider"], "minimax")
         self.assertIn("defaults", payload)
+        self.assertIn("providers", payload)
         self.assertIn("voice_id", payload["defaults"])
 
     def test_print_config_path_uses_resolved_path(self):
@@ -234,6 +238,17 @@ class CLITests(unittest.TestCase):
 
         self.assertEqual(exit_code, ExitCode.AUTH)
         self.assertIn("MINIMAX_API_KEY", buffer.getvalue())
+
+    def test_doctor_subcommand_honors_provider_override(self):
+        buffer = io.StringIO()
+        with patch.dict(os.environ, {}, clear=True):
+            with redirect_stdout(buffer):
+                exit_code = cli.main(["doctor", "--provider", "elevenlabs"])
+
+        self.assertEqual(exit_code, ExitCode.AUTH)
+        self.assertIn("provider", buffer.getvalue())
+        self.assertIn("elevenlabs", buffer.getvalue())
+        self.assertIn("ELEVENLABS_API_KEY", buffer.getvalue())
 
     def test_invalid_config_returns_config_exit_code(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -393,6 +408,53 @@ class CLITests(unittest.TestCase):
             self.assertEqual(payload["voice_setting"]["pitch"], 2)
             self.assertEqual(payload["audio_setting"]["sample_rate"], 44100)
 
+    def test_provider_scoped_config_values_are_used_when_cli_flags_are_absent(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            config_path = Path(temp_dir) / "config.json"
+            custom_root = Path(temp_dir) / "custom-out"
+            input_path.write_text("第一段", encoding="utf-8")
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider": "minimax",
+                        "defaults": {
+                            "voice_id": "cfg-voice",
+                            "speed": 1.6,
+                            "model": "cfg-model",
+                            "output_root": str(custom_root),
+                        },
+                        "providers": {
+                            "minimax": {
+                                "pitch": 2,
+                                "language_boost": "Chinese,Mandarin",
+                                "sample_rate": 44100,
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            response = MockResponse(
+                200,
+                {"base_resp": {"status_code": 0}, "data": {"audio": "414243"}},
+            )
+
+            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-key"}, clear=True):
+                with patch(
+                    "voice_dashboard.pipeline.requests.post", return_value=response
+                ) as mock_post:
+                    exit_code = cli.main([str(input_path), "--config", str(config_path)])
+            self.assertEqual(exit_code, ExitCode.OK)
+            payload = mock_post.call_args.kwargs["json"]
+            self.assertEqual(payload["model"], "cfg-model")
+            self.assertEqual(payload["language_boost"], "Chinese,Mandarin")
+            self.assertEqual(payload["voice_setting"]["voice_id"], "cfg-voice")
+            self.assertEqual(payload["voice_setting"]["speed"], 1.6)
+            self.assertEqual(payload["voice_setting"]["pitch"], 2)
+            self.assertEqual(payload["audio_setting"]["sample_rate"], 44100)
+
     def test_config_runtime_values_are_used_when_cli_flags_are_absent(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             input_path = Path(temp_dir) / "input.txt"
@@ -497,9 +559,37 @@ class CLITests(unittest.TestCase):
 
             self.assertEqual(exit_code, ExitCode.OK)
             payload = json.loads(buffer.getvalue())
+            self.assertEqual(payload["provider"], "minimax")
             self.assertEqual(payload["defaults"]["voice_id"], "cfg-voice")
             self.assertEqual(payload["config_path"], str(config_path))
             self.assertTrue(payload["config_exists"])
+
+    def test_config_show_reports_explicit_provider(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider": "elevenlabs",
+                        "defaults": {
+                            "voice_id": "voice-123",
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            buffer = io.StringIO()
+
+            with redirect_stdout(buffer):
+                exit_code = cli.main(
+                    ["config", "show", "--config", str(config_path)]
+                )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            payload = json.loads(buffer.getvalue())
+            self.assertEqual(payload["provider"], "elevenlabs")
+            self.assertEqual(payload["defaults"]["voice_id"], "voice-123")
 
     def test_config_show_includes_runtime_defaults(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -950,6 +1040,91 @@ class BatchFlowTests(unittest.TestCase):
                         exit_code = cli.main([str(input_path), "--output-dir", str(output_dir)])
             self.assertEqual(exit_code, ExitCode.OK)
             self.assertEqual(mock_post.call_count, 2)
+
+    def test_config_provider_is_used_when_cli_provider_is_absent(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            config_path = Path(temp_dir) / "config.json"
+            input_path.write_text("第一段", encoding="utf-8")
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider": "elevenlabs",
+                        "defaults": {
+                            "voice_id": "voice-123",
+                            "model": "eleven-model",
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            stderr_buffer = io.StringIO()
+
+            with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}, clear=True):
+                with patch("voice_dashboard.pipeline.requests.post") as mock_post:
+                    with redirect_stderr(stderr_buffer):
+                        exit_code = cli.main(
+                            [
+                                str(input_path),
+                                "--config",
+                                str(config_path),
+                                "--output-dir",
+                                str(output_dir),
+                            ]
+                        )
+
+            self.assertEqual(exit_code, ExitCode.API)
+            self.assertEqual(mock_post.call_count, 0)
+            self.assertIn("Provider 'elevenlabs' is configured", stderr_buffer.getvalue())
+
+    def test_cli_provider_overrides_config_provider(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            config_path = Path(temp_dir) / "config.json"
+            input_path.write_text("第一段", encoding="utf-8")
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "provider": "minimax",
+                        "defaults": {
+                            "voice_id": "voice-123",
+                            "model": "cfg-model",
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            stderr_buffer = io.StringIO()
+
+            with patch.dict(
+                os.environ,
+                {
+                    "MINIMAX_API_KEY": "minimax-key",
+                    "ELEVENLABS_API_KEY": "elevenlabs-key",
+                },
+                clear=True,
+            ):
+                with patch("voice_dashboard.pipeline.requests.post") as mock_post:
+                    with redirect_stderr(stderr_buffer):
+                        exit_code = cli.main(
+                            [
+                                str(input_path),
+                                "--config",
+                                str(config_path),
+                                "--provider",
+                                "elevenlabs",
+                                "--output-dir",
+                                str(output_dir),
+                            ]
+                        )
+
+            self.assertEqual(exit_code, ExitCode.API)
+            self.assertEqual(mock_post.call_count, 0)
+            self.assertIn("Provider 'elevenlabs' is configured", stderr_buffer.getvalue())
 
     def test_json_summary_prints_summary_to_stdout(self):
         with tempfile.TemporaryDirectory() as temp_dir:

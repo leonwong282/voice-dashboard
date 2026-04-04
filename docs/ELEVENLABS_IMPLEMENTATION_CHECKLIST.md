@@ -72,19 +72,19 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Add top-level config field `provider`.
-- [ ] Default provider to `minimax` when config does not specify one.
-- [ ] Add `--provider {minimax,elevenlabs}` to CLI.
-- [ ] Implement precedence rule: `CLI > config > default`.
-- [ ] Separate common TTS settings from provider-specific settings in code.
-- [ ] Preserve legacy MiniMax config parsing from `defaults` for backward compatibility.
-- [ ] Keep current MiniMax defaults intact for users who do not opt into provider selection.
+- [x] Add top-level config field `provider`.
+- [x] Default provider to `minimax` when config does not specify one.
+- [x] Add `--provider {minimax,elevenlabs}` to CLI.
+- [x] Implement precedence rule: `CLI > config > default`.
+- [x] Separate common TTS settings from provider-specific settings in code.
+- [x] Preserve legacy MiniMax config parsing from `defaults` for backward compatibility.
+- [x] Keep current MiniMax defaults intact for users who do not opt into provider selection.
 
 Acceptance:
 
-- [ ] A legacy MiniMax config with no `provider` still works.
-- [ ] `ttsrun --provider minimax` behaves the same as before.
-- [ ] `ttsrun --provider elevenlabs` is parsed successfully even before the adapter is complete.
+- [x] A legacy MiniMax config with no `provider` still works.
+- [x] `ttsrun --provider minimax` behaves the same as before.
+- [x] `ttsrun --provider elevenlabs` is parsed successfully even before the adapter is complete.
 
 ## 6. Phase 3: Add Provider-Specific API Key Resolution
 
@@ -98,19 +98,19 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Stop using one hard-coded API key lookup path.
-- [ ] Resolve the active provider before reading any API key.
-- [ ] For MiniMax, read `MINIMAX_API_KEY`.
-- [ ] For ElevenLabs, read `ELEVENLABS_API_KEY`.
-- [ ] Return clear provider-specific auth errors.
-- [ ] Update `ttsrun doctor` to validate only the active provider key as required.
+- [x] Stop using one hard-coded API key lookup path.
+- [x] Resolve the active provider before reading any API key.
+- [x] For MiniMax, read `MINIMAX_API_KEY`.
+- [x] For ElevenLabs, read `ELEVENLABS_API_KEY`.
+- [x] Return clear provider-specific auth errors.
+- [x] Update `ttsrun doctor` to validate only the active provider key as required.
 - [ ] Optionally report the inactive provider key as informational only.
 
 Acceptance:
 
-- [ ] Active provider auth succeeds when the correct env var is present.
-- [ ] Active provider auth fails clearly when the correct env var is missing.
-- [ ] Presence or absence of the inactive provider key does not affect the run.
+- [x] Active provider auth succeeds when the correct env var is present.
+- [x] Active provider auth fails clearly when the correct env var is missing.
+- [x] Presence or absence of the inactive provider key does not affect the run.
 
 ## 7. Phase 4: Implement ElevenLabs TTS Adapter
 
