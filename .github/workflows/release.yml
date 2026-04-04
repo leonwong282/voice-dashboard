@@ -1,0 +1,156 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install project and development dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Validate source tree and build artifacts
+        run: make check release-smoke
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Generate artifact checksums
+        run: sha256sum dist/* > dist/SHA256SUMS.txt
+
+      - name: Upload checksum artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+  public-install-smoke:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: pypi-publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify published pip and pipx install paths
+        run: |
+          python scripts/verify_public_install.py \
+            --package-spec "voice-dashboard==${GITHUB_REF_NAME#v}"
+
+  homebrew-formula:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: pypi-publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install script dependencies
+        run: python -m pip install -e .
+
+      - name: Render Homebrew formula for this tag
+        run: |
+          mkdir -p release-assets
+          python scripts/render_homebrew_formula.py \
+            --package-version "${GITHUB_REF_NAME#v}" \
+            --output release-assets/voice-dashboard.rb
+
+      - name: Upload Homebrew formula artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homebrew-formula
+          path: release-assets/voice-dashboard.rb
+          if-no-files-found: error
+
+  github-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - build
+      - pypi-publish
+      - public-install-smoke
+      - homebrew-formula
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Download checksum artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: checksums
+          path: release-assets
+
+      - name: Download Homebrew formula artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: homebrew-formula
+          path: release-assets
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* release-assets/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* release-assets/* --verify-tag --generate-notes
+          fi
+
+  pypi-publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/voice-dashboard
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

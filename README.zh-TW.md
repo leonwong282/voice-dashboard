@@ -23,8 +23,12 @@
 - 三種輸入來源（三選一）：
   - 檔案：`ttsrun <file.txt>`
   - 標準輸入：`ttsrun --stdin`
-  - 剪貼簿（macOS）：`ttsrun --clipboard`
+  - 剪貼簿（支援的系統上）：`ttsrun --clipboard`
 - 可選合併：只有加上 `--merge` 才會合併為單一檔案。
+- 為自動化與腳本提供輸出控制：
+  - `--quiet`
+  - `--verbose`
+  - `--json-summary`
 - 產出追蹤檔案：
   - `manifest.json`
   - `errors.jsonl`
@@ -37,11 +41,29 @@
 export MINIMAX_API_KEY="你的新 key"
 ```
 
-### 2) 安裝（開發模式）
+### 2) 安裝
+
+一般本地使用原始碼時：
 
 ```bash
-python3 -m pip install -e .
+python3 -m pip install .
 ```
+
+等套件正式發布到 PyPI 後，CLI 型工具建議優先用 `pipx` 安裝：
+
+```bash
+pipx install voice-dashboard
+```
+
+如果你明確想裝進某個既有 Python 環境：
+
+```bash
+python3 -m pip install voice-dashboard
+```
+
+Homebrew 安裝通道已規劃，但尚未正式發布；預計做法記錄在 `docs/HOMEBREW.md`。
+
+如果是要參與開發，請改看開發指南並使用 editable install。
 
 ### 3) 執行
 
@@ -64,11 +86,33 @@ pbpaste | ttsrun --stdin --merge
 - `--merge`：全部成功後合併，並刪除分段檔。
 - `--open`：完成後嘗試打開輸出目錄。
 - `--config <path>`：使用指定設定檔。
-- `--print-config-example`：輸出設定檔範例。
+- `--version`：輸出目前 CLI 版本。
+- `doctor`：檢查設定檔、API key 與可選依賴。
+- `config path`：輸出實際設定檔路徑。
+- `config show`：以 JSON 顯示目前生效設定。
+- `config example`：輸出設定檔範例。
+- `config init`：寫入一份設定檔範例。
+- `--quiet` / `--verbose`：控制 stderr 上的進度輸出。
+- `--json-summary`：以 JSON 輸出最終摘要。
+
+建議優先使用新的管理子命令：
+
+```bash
+ttsrun doctor
+ttsrun config path
+ttsrun config show
+ttsrun config init
+```
+
+也支援用 `ttsrun run <input_path>` 明確執行批次流程。舊的管理 flags 仍保留，但已標示為 deprecated 的相容層。
 
 ## 📖 文件
 
 - 完整使用說明（英文）：[docs/USAGE.md](docs/USAGE.md)
+- 開發指南（英文）：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- Homebrew 指南（英文）：[docs/HOMEBREW.md](docs/HOMEBREW.md)
+- 發布指南（英文）：[docs/RELEASING.md](docs/RELEASING.md)
+- 產品化路線圖：[docs/ROADMAP.md](docs/ROADMAP.md)
 
 <p align="right">(<a href="#readme-top">回到頂部</a>)</p>
 

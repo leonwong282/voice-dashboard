@@ -4,13 +4,58 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "voice-dashboard"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Daily-friendly MiniMax batch TTS CLI"
+readme = { file = "README.md", content-type = "text/markdown" }
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+authors = [{ name = "Leon Wong" }]
+keywords = ["audio", "cli", "minimax", "text-to-speech", "tts"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Utilities",
+]
 requires-python = ">=3.10"
 dependencies = ["requests>=2.31.0"]
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.2.2",
+    "pyflakes>=3.2.0",
+    "pytest>=8.3.5",
+    "tomli>=2.0.1; python_version < '3.11'",
+    "twine>=6.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/leonwong282/voice-dashboard"
+Source = "https://github.com/leonwong282/voice-dashboard"
+Issues = "https://github.com/leonwong282/voice-dashboard/issues"
+Changelog = "https://github.com/leonwong282/voice-dashboard/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/leonwong282/voice-dashboard/tree/main/docs"
+Releases = "https://github.com/leonwong282/voice-dashboard/releases"
 
 [project.scripts]
 ttsrun = "voice_dashboard.cli:main_entry"
 
 [tool.setuptools]
-packages = ["voice_dashboard"]
+include-package-data = false
+
+[tool.setuptools.dynamic]
+version = { attr = "voice_dashboard.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["voice_dashboard*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,23 +1,21 @@
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
 from voice_dashboard.defaults import (
-    DEFAULT_CONFIG_PATH,
     DEFAULT_FORMAT,
     DEFAULT_LANGUAGE_BOOST,
     DEFAULT_MODEL,
-    DEFAULT_OUTPUT_ROOT,
     DEFAULT_PITCH,
     DEFAULT_SAMPLE_RATE,
     DEFAULT_SPEED,
     DEFAULT_VOICE_ID,
+    default_config_path,
+    default_output_root,
+    legacy_config_path,
 )
-
-
-class ConfigError(RuntimeError):
-    """Raised when the local configuration file is invalid."""
+from voice_dashboard.errors import ConfigError
 
 
 @dataclass(frozen=True)
@@ -29,9 +27,9 @@ class AppConfig:
     model: str = DEFAULT_MODEL
     sample_rate: int = DEFAULT_SAMPLE_RATE
     audio_format: str = DEFAULT_FORMAT
-    output_root: Path = DEFAULT_OUTPUT_ROOT
+    output_root: Path = field(default_factory=default_output_root)
     open_after_finish: bool = False
-    config_path: Path = DEFAULT_CONFIG_PATH
+    config_path: Path = field(default_factory=default_config_path)
 
 
 def _coerce_str(value: Any, field_name: str) -> str:
@@ -59,18 +57,63 @@ def _coerce_bool(value: Any, field_name: str) -> bool:
 
 
 def example_config() -> dict[str, Any]:
-    config = AppConfig()
+    return serialize_config(AppConfig())
+
+
+def serialize_config(
+    config: AppConfig,
+    include_metadata: bool = False,
+) -> dict[str, Any]:
     data = asdict(config)
     data["output_root"] = str(config.output_root)
     data["format"] = data.pop("audio_format")
     data.pop("config_path", None)
-    return {"defaults": data}
+
+    payload: dict[str, Any] = {"defaults": data}
+    if include_metadata:
+        preferred_config_path = default_config_path()
+        legacy_path = legacy_config_path()
+        payload["config_path"] = str(config.config_path)
+        payload["config_exists"] = config.config_path.exists()
+        payload["preferred_config_path"] = str(preferred_config_path)
+        payload["legacy_config_path"] = str(legacy_path)
+        payload["using_legacy_config_path"] = (
+            config.config_path == legacy_path and config.config_path != preferred_config_path
+        )
+    return payload
+
+
+def resolve_config_path(config_path: str | None) -> Path:
+    if config_path:
+        return Path(config_path).expanduser()
+
+    preferred_path = default_config_path()
+    legacy_path = legacy_config_path()
+    if legacy_path.exists() and not preferred_path.exists():
+        return legacy_path
+    return preferred_path
+
+
+def write_example_config(
+    config_path: str | None = None,
+    overwrite: bool = False,
+) -> Path:
+    resolved_path = resolve_config_path(config_path)
+    if resolved_path.exists() and not overwrite:
+        raise ConfigError(
+            f"Config file already exists: {resolved_path}. Use --force to overwrite it."
+        )
+
+    resolved_path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_path.write_text(
+        json.dumps(example_config(), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return resolved_path
 
 
 def load_config(config_path: str | None) -> AppConfig:
-    resolved_path = (
-        Path(config_path).expanduser() if config_path else DEFAULT_CONFIG_PATH
-    )
+    resolved_path = resolve_config_path(config_path)
     if not resolved_path.exists():
         return AppConfig(config_path=resolved_path)
 

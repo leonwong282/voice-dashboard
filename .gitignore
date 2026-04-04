@@ -1,0 +1,17 @@
+.DS_Store
+*.py[cod]
+*.so
+__pycache__/
+
+.coverage
+.pytest_cache/
+.ruff_cache/
+.venv/
+.mypy_cache/
+
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+outputs/
