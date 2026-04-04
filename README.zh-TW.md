@@ -6,7 +6,7 @@
 
 > 日常可用的 MiniMax 批量文字轉語音（TTS）命令列工具。
 
-![Version](https://img.shields.io/badge/Version-0.7.1-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.7.2-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL--3.0-red?style=for-the-badge)
 ![CLI](https://img.shields.io/badge/CLI-ttsrun-green?style=for-the-badge)

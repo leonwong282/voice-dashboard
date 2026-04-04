@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-04-04
+
 ### Changed
-- Upgraded GitHub Actions artifact steps to `actions/upload-artifact@v6` and `actions/download-artifact@v8` to remove the remaining Node 20 deprecation warnings from the release pipeline.
+- Validation patch release to rerun the full PyPI, Homebrew, and GitHub Release flow after upgrading artifact actions to Node 24-compatible versions.
 
 ## [0.7.1] - 2026-04-04
 
 ### Changed
+- Upgraded GitHub Actions artifact steps to `actions/upload-artifact@v6` and `actions/download-artifact@v8` to remove the remaining Node 20 deprecation warnings from the release pipeline.
 - Validation patch release to rerun the full tag-driven PyPI, GitHub Release, and Homebrew automation after the `0.7.0` stabilization release.
 
 ## [0.7.0] - 2026-04-04
@@ -106,7 +109,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `README-old.md`
   - `docs/USAGE-old.md`
 
-[Unreleased]: https://github.com/leonwong282/voice-dashboard/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/leonwong282/voice-dashboard/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.7.2
 [0.7.1]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.7.1
 [0.7.0]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.7.0
 [0.4.5]: https://github.com/leonwong282/voice-dashboard/releases/tag/v0.4.5

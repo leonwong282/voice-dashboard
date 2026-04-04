@@ -37,7 +37,7 @@ make smoke
 make build
 make dist-sha256
 make homebrew-formula SOURCE_URL=... SOURCE_SHA256=...
-make public-install-smoke PACKAGE_SPEC=voice-dashboard==0.7.1
+make public-install-smoke PACKAGE_SPEC=voice-dashboard==0.7.2
 make release-smoke
 ```
 
