@@ -87,25 +87,25 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Add provider-local ElevenLabs config fields:
+- [x] Add provider-local ElevenLabs config fields:
   - `output_format`
   - `language_code`
   - `seed`
   - `enable_logging`
-- [ ] Add nested `voice_settings` under `providers.elevenlabs`.
-- [ ] Support:
+- [x] Add nested `voice_settings` under `providers.elevenlabs`.
+- [x] Support:
   - `stability`
   - `similarity_boost`
   - `style`
   - `use_speaker_boost`
   - `speed`
-- [ ] Validate these fields inside the ElevenLabs config branch only.
-- [ ] Keep these fields out of `global`.
+- [x] Validate these fields inside the ElevenLabs config branch only.
+- [x] Keep these fields out of `global`.
 
 Acceptance:
 
-- [ ] ElevenLabs-native request fields can be stored in config without abusing shared fields.
-- [ ] Invalid ElevenLabs config values fail with clear config errors.
+- [x] ElevenLabs-native request fields can be stored in config without abusing shared fields.
+- [x] Invalid ElevenLabs config values fail with clear config errors.
 
 ## 6. Phase 4: Expand ElevenLabs Adapter With Low-Risk Fields
 

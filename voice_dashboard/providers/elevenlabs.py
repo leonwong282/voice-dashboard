@@ -7,13 +7,14 @@ import requests
 from voice_dashboard.defaults import (
     DEFAULT_MODEL,
     ELEVENLABS_DEFAULT_MODEL,
+    ELEVENLABS_DEFAULT_OUTPUT_FORMAT,
 )
 from voice_dashboard.errors import ApiError, AuthenticationError, RetryableApiError
 from voice_dashboard.providers.base import ElevenLabsTTSSettings
 
 
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech"
-ELEVENLABS_OUTPUT_FORMAT = "mp3_44100_128"
+ELEVENLABS_OUTPUT_FORMAT = ELEVENLABS_DEFAULT_OUTPUT_FORMAT
 
 
 def extract_api_error_message(response: requests.Response) -> str:

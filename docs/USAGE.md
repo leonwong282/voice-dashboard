@@ -269,7 +269,18 @@ Current schema:
     "elevenlabs": {
       "voice_id": "JBFqnCBsd6RMkjVDRZzb",
       "speed": 1.0,
-      "model": "eleven_multilingual_v2"
+      "model": "eleven_multilingual_v2",
+      "output_format": "mp3_44100_128",
+      "language_code": "zh",
+      "seed": 12345,
+      "enable_logging": true,
+      "voice_settings": {
+        "speed": 0.95,
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.1,
+        "use_speaker_boost": true
+      }
     }
   }
 }
@@ -280,7 +291,7 @@ Meaning of each section:
 - `default_provider`: used when CLI does not pass `--provider`
 - `global`: only for settings that make sense regardless of provider
 - `providers.minimax`: MiniMax defaults, including shared-looking fields such as `voice_id`, `model`, and `speed`
-- `providers.elevenlabs`: ElevenLabs defaults, also with its own `voice_id`, `model`, and `speed`
+- `providers.elevenlabs`: ElevenLabs defaults, with its own `voice_id`, `model`, `speed`, and optional provider-native fields such as `output_format`, `language_code`, `seed`, `enable_logging`, and nested `voice_settings`
 
 Runtime precedence:
 
@@ -312,7 +323,7 @@ Those are stored under each provider because they are provider-specific in pract
 One config can now hold both providers cleanly:
 
 - MiniMax can keep its own `voice_id`, `model`, `speed`, `pitch`, `language_boost`, `sample_rate`
-- ElevenLabs can keep its own `voice_id`, `model`, `speed`
+- ElevenLabs can keep its own `voice_id`, `model`, `speed`, and provider-native request fields
 
 Example:
 
@@ -338,7 +349,18 @@ Example:
     "elevenlabs": {
       "voice_id": "JBFqnCBsd6RMkjVDRZzb",
       "speed": 1.0,
-      "model": "eleven_multilingual_v2"
+      "model": "eleven_multilingual_v2",
+      "output_format": "mp3_44100_128",
+      "language_code": "zh",
+      "seed": 12345,
+      "enable_logging": true,
+      "voice_settings": {
+        "speed": 0.95,
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.1,
+        "use_speaker_boost": true
+      }
     }
   }
 }
@@ -363,7 +385,17 @@ export ELEVENLABS_API_KEY="your_elevenlabs_key"
 
 `ttsrun` only checks the key for the active provider.
 
-### 6.5 Using a custom config path
+### 6.5 ElevenLabs config surface note
+
+`providers.elevenlabs` now accepts provider-native fields such as `output_format`, `language_code`, `seed`, `enable_logging`, and nested `voice_settings`.
+
+Current runtime note:
+
+- the basic ElevenLabs synthesis path still centers on `voice_id`, `model`, and `speed`
+- the additional provider-native config fields are schema-supported now so the config model no longer has to pretend all providers look the same
+- request mapping for those extra fields is expanded incrementally in later implementation phases
+
+### 6.6 Using a custom config path
 
 Use a custom config path:
 
@@ -371,7 +403,7 @@ Use a custom config path:
 ttsrun examples/sample.txt --config /path/to/config.json
 ```
 
-### 6.6 Provider Notes
+### 6.7 Provider Notes
 
 - `ttsrun` is TTS-only. It expects an existing `voice_id`.
 - `--provider minimax` supports MiniMax-specific controls such as `--pitch`, `--language-boost`, and `--sample-rate`.

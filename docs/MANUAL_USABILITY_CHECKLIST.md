@@ -48,7 +48,18 @@ Prepare a config file:
     "elevenlabs": {
       "voice_id": "your_elevenlabs_voice_id",
       "speed": 1.0,
-      "model": "eleven_multilingual_v2"
+      "model": "eleven_multilingual_v2",
+      "output_format": "mp3_44100_128",
+      "language_code": "zh",
+      "seed": 12345,
+      "enable_logging": true,
+      "voice_settings": {
+        "speed": 0.95,
+        "stability": 0.5,
+        "similarity_boost": 0.8,
+        "style": 0.1,
+        "use_speaker_boost": true
+      }
     }
   }
 }
@@ -77,6 +88,7 @@ export ELEVENLABS_API_KEY="your_elevenlabs_key"
   - `providers.minimax`
   - `providers.elevenlabs`
 - Confirm both providers have their own `voice_id`, `model`, and `speed`
+- Confirm `providers.elevenlabs` also carries its provider-local fields if you configured them
 - Confirm `global.output_root` and `global.request_timeout_seconds` look correct
 
 ## 3. Doctor Checks

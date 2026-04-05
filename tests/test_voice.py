@@ -88,6 +88,8 @@ class CLITests(unittest.TestCase):
         self.assertIn("format", payload["global"])
         self.assertIn("voice_id", payload["providers"]["elevenlabs"])
         self.assertIn("model", payload["providers"]["elevenlabs"])
+        self.assertIn("output_format", payload["providers"]["elevenlabs"])
+        self.assertIn("voice_settings", payload["providers"]["elevenlabs"])
         self.assertIn("deprecated", stderr_buffer.getvalue())
         self.assertIn("ttsrun config example", stderr_buffer.getvalue())
 
@@ -102,6 +104,8 @@ class CLITests(unittest.TestCase):
         self.assertIn("global", payload)
         self.assertIn("providers", payload)
         self.assertIn("voice_id", payload["providers"]["minimax"])
+        self.assertIn("output_format", payload["providers"]["elevenlabs"])
+        self.assertIn("voice_settings", payload["providers"]["elevenlabs"])
 
     def test_print_config_path_uses_resolved_path(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -661,6 +665,58 @@ class CLITests(unittest.TestCase):
             self.assertEqual(payload["default_provider"], "elevenlabs")
             self.assertEqual(payload["providers"]["elevenlabs"]["voice_id"], "voice-123")
 
+    def test_config_show_reports_elevenlabs_native_config_fields(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_provider": "elevenlabs",
+                        "providers": {
+                            "elevenlabs": {
+                                "voice_id": "voice-123",
+                                "model": "eleven-model",
+                                "speed": 1.1,
+                                "output_format": "mp3_44100_128",
+                                "language_code": "zh",
+                                "seed": 12345,
+                                "enable_logging": True,
+                                "voice_settings": {
+                                    "speed": 0.95,
+                                    "stability": 0.5,
+                                    "similarity_boost": 0.8,
+                                    "style": 0.1,
+                                    "use_speaker_boost": True,
+                                },
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            buffer = io.StringIO()
+
+            with redirect_stdout(buffer):
+                exit_code = cli.main(
+                    ["config", "show", "--config", str(config_path)]
+                )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            payload = json.loads(buffer.getvalue())
+            elevenlabs = payload["providers"]["elevenlabs"]
+            self.assertEqual(elevenlabs["output_format"], "mp3_44100_128")
+            self.assertEqual(elevenlabs["language_code"], "zh")
+            self.assertEqual(elevenlabs["seed"], 12345)
+            self.assertEqual(elevenlabs["enable_logging"], True)
+            self.assertEqual(elevenlabs["voice_settings"]["speed"], 0.95)
+            self.assertEqual(elevenlabs["voice_settings"]["stability"], 0.5)
+            self.assertEqual(elevenlabs["voice_settings"]["similarity_boost"], 0.8)
+            self.assertEqual(elevenlabs["voice_settings"]["style"], 0.1)
+            self.assertEqual(
+                elevenlabs["voice_settings"]["use_speaker_boost"], True
+            )
+
     def test_config_show_includes_runtime_defaults(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "config.json"
@@ -710,6 +766,32 @@ class CLITests(unittest.TestCase):
 
             self.assertEqual(exit_code, ExitCode.CONFIG)
             self.assertIn("Legacy config schema is not supported", stderr_buffer.getvalue())
+
+    def test_invalid_elevenlabs_seed_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            stderr_buffer = io.StringIO()
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "providers": {
+                            "elevenlabs": {
+                                "seed": "invalid",
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            with redirect_stderr(stderr_buffer):
+                exit_code = cli.main(["config", "show", "--config", str(config_path)])
+
+            self.assertEqual(exit_code, ExitCode.CONFIG)
+            self.assertIn(
+                "providers.elevenlabs.seed", stderr_buffer.getvalue()
+            )
 
     def test_config_show_reports_legacy_resolution_metadata(self):
         with tempfile.TemporaryDirectory() as temp_dir:

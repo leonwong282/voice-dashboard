@@ -11,6 +11,7 @@ from voice_dashboard.defaults import (
     DEFAULT_SAMPLE_RATE,
     DEFAULT_TIMEOUT_SECONDS,
     ELEVENLABS_DEFAULT_MODEL,
+    ELEVENLABS_DEFAULT_OUTPUT_FORMAT,
     ELEVENLABS_DEFAULT_SPEED,
     ELEVENLABS_DEFAULT_VOICE_ID,
     MINIMAX_DEFAULT_MODEL,
@@ -51,6 +52,22 @@ class ElevenLabsConfig:
     voice_id: str = ELEVENLABS_DEFAULT_VOICE_ID
     speed: float = ELEVENLABS_DEFAULT_SPEED
     model: str = ELEVENLABS_DEFAULT_MODEL
+    output_format: str = ELEVENLABS_DEFAULT_OUTPUT_FORMAT
+    language_code: str | None = None
+    seed: int | None = None
+    enable_logging: bool | None = None
+    voice_settings: "ElevenLabsVoiceSettings" = field(
+        default_factory=lambda: ElevenLabsVoiceSettings()
+    )
+
+
+@dataclass(frozen=True)
+class ElevenLabsVoiceSettings:
+    speed: float | None = None
+    stability: float | None = None
+    similarity_boost: float | None = None
+    style: float | None = None
+    use_speaker_boost: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -123,6 +140,30 @@ def _coerce_bool(value: Any, field_name: str) -> bool:
     if not isinstance(value, bool):
         raise ConfigError(f"Config field '{field_name}' must be true or false.")
     return value
+
+
+def _coerce_optional_str(value: Any, field_name: str) -> str | None:
+    if value is None:
+        return None
+    return _coerce_str(value, field_name)
+
+
+def _coerce_optional_float(value: Any, field_name: str) -> float | None:
+    if value is None:
+        return None
+    return _coerce_float(value, field_name)
+
+
+def _coerce_optional_int(value: Any, field_name: str) -> int | None:
+    if value is None:
+        return None
+    return _coerce_int(value, field_name)
+
+
+def _coerce_optional_bool(value: Any, field_name: str) -> bool | None:
+    if value is None:
+        return None
+    return _coerce_bool(value, field_name)
 
 
 def _coerce_provider(value: Any, field_name: str = "default_provider") -> str:
@@ -319,6 +360,55 @@ def load_config(config_path: str | None) -> AppConfig:
         elevenlabs_updates["model"] = _coerce_str(
             elevenlabs_values["model"], "providers.elevenlabs.model"
         )
+    if "output_format" in elevenlabs_values:
+        elevenlabs_updates["output_format"] = _coerce_str(
+            elevenlabs_values["output_format"], "providers.elevenlabs.output_format"
+        )
+    if "language_code" in elevenlabs_values:
+        elevenlabs_updates["language_code"] = _coerce_optional_str(
+            elevenlabs_values["language_code"],
+            "providers.elevenlabs.language_code",
+        )
+    if "seed" in elevenlabs_values:
+        elevenlabs_updates["seed"] = _coerce_optional_int(
+            elevenlabs_values["seed"], "providers.elevenlabs.seed"
+        )
+    if "enable_logging" in elevenlabs_values:
+        elevenlabs_updates["enable_logging"] = _coerce_optional_bool(
+            elevenlabs_values["enable_logging"],
+            "providers.elevenlabs.enable_logging",
+        )
+
+    elevenlabs_voice_settings_values = elevenlabs_values.get("voice_settings", {})
+    elevenlabs_voice_settings_values = _expect_object(
+        elevenlabs_voice_settings_values, "providers.elevenlabs.voice_settings"
+    )
+    elevenlabs_voice_settings_updates: dict[str, Any] = {}
+    if "speed" in elevenlabs_voice_settings_values:
+        elevenlabs_voice_settings_updates["speed"] = _coerce_optional_float(
+            elevenlabs_voice_settings_values["speed"],
+            "providers.elevenlabs.voice_settings.speed",
+        )
+    if "stability" in elevenlabs_voice_settings_values:
+        elevenlabs_voice_settings_updates["stability"] = _coerce_optional_float(
+            elevenlabs_voice_settings_values["stability"],
+            "providers.elevenlabs.voice_settings.stability",
+        )
+    if "similarity_boost" in elevenlabs_voice_settings_values:
+        elevenlabs_voice_settings_updates["similarity_boost"] = _coerce_optional_float(
+            elevenlabs_voice_settings_values["similarity_boost"],
+            "providers.elevenlabs.voice_settings.similarity_boost",
+        )
+    if "style" in elevenlabs_voice_settings_values:
+        elevenlabs_voice_settings_updates["style"] = _coerce_optional_float(
+            elevenlabs_voice_settings_values["style"],
+            "providers.elevenlabs.voice_settings.style",
+        )
+    if "use_speaker_boost" in elevenlabs_voice_settings_values:
+        elevenlabs_voice_settings_updates["use_speaker_boost"] = _coerce_optional_bool(
+            elevenlabs_voice_settings_values["use_speaker_boost"],
+            "providers.elevenlabs.voice_settings.use_speaker_boost",
+        )
 
     merged = asdict(config)
     merged.update(app_updates)
@@ -327,6 +417,15 @@ def load_config(config_path: str | None) -> AppConfig:
     )
     merged["minimax"] = MiniMaxConfig(**{**asdict(config.minimax), **minimax_updates})
     merged["elevenlabs"] = ElevenLabsConfig(
-        **{**asdict(config.elevenlabs), **elevenlabs_updates}
+        **{
+            **asdict(config.elevenlabs),
+            **elevenlabs_updates,
+            "voice_settings": ElevenLabsVoiceSettings(
+                **{
+                    **asdict(config.elevenlabs.voice_settings),
+                    **elevenlabs_voice_settings_updates,
+                }
+            ),
+        }
     )
     return AppConfig(**merged)
