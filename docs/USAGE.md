@@ -393,6 +393,13 @@ export ELEVENLABS_API_KEY="your_elevenlabs_key"
 
 `providers.elevenlabs` supports provider-native request fields such as `output_format`, `timestamps`, `language_code`, `seed`, `enable_logging`, `continuity_mode`, and nested `voice_settings`.
 
+Speed note:
+
+- `providers.elevenlabs.speed` is the tool-level shared speed value for the active provider
+- `providers.elevenlabs.voice_settings.speed` is the ElevenLabs-native override
+- if both are present, `voice_settings.speed` wins for the actual ElevenLabs request
+- if you do not need an ElevenLabs-specific override, set only the outer `speed`
+
 Current runtime note:
 
 - `output_format` is sent as an ElevenLabs query parameter

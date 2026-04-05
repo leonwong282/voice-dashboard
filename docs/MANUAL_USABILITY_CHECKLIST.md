@@ -91,6 +91,9 @@ export ELEVENLABS_API_KEY="your_elevenlabs_key"
   - `providers.elevenlabs`
 - Confirm both providers have their own `voice_id`, `model`, and `speed`
 - Confirm `providers.elevenlabs` also carries its provider-local fields if you configured them
+- If both `providers.elevenlabs.speed` and `providers.elevenlabs.voice_settings.speed` are set:
+  - treat the outer `speed` as the shared/default value
+  - treat `voice_settings.speed` as the ElevenLabs-specific override
 - Confirm `global.output_root` and `global.request_timeout_seconds` look correct
 
 ## 3. Doctor Checks
