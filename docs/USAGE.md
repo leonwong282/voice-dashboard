@@ -202,7 +202,7 @@ Each run generates at least:
 - `errors.jsonl`: only failed segments
 - Segment files (`0001.mp3`, etc.) when using segment-based providers and not merging
 - `merged.mp3` when merge succeeds on a segment-based provider
-- `output.mp3` when using `minimax-async`
+- extracted MiniMax async provider files when using `minimax-async` (for example `*.mp3`, `*.titles`, `*.extra`) plus a derived `subtitle.srt` when subtitle generation is enabled
 
 ## 6. Config File
 
@@ -400,7 +400,7 @@ Example:
 With that config:
 
 - `ttsrun input.txt` uses MiniMax by default
-- `ttsrun --provider minimax-async input.txt` submits the whole normalized input as one async MiniMax task and writes `output.mp3` plus subtitle / extra attachments when returned
+- `ttsrun --provider minimax-async input.txt` submits the whole normalized input as one async MiniMax task, preserves the extracted provider files, and writes a derived `subtitle.srt` when subtitle generation is enabled
 - `ttsrun --provider elevenlabs input.txt` switches to the ElevenLabs section
 - `ttsrun --provider elevenlabs --voice-id custom123 input.txt` overrides only the current run
 
@@ -456,7 +456,7 @@ ttsrun examples/sample.txt --config /path/to/config.json
   - `minimax-async` for whole-input async generation with subtitle-oriented outputs
 - `--provider minimax`, `--provider minimax-sync`, and `--provider minimax-async` all currently use `MINIMAX_API_KEY`.
 - `--provider minimax`, `--provider minimax-sync`, and `--provider minimax-async` support MiniMax-specific controls such as `--pitch`, `--language-boost`, and `--sample-rate`.
-- `--provider minimax-async` writes one whole-input audio file (`output.mp3` by default) instead of `0001.mp3`, `0002.mp3`, ...
+- `--provider minimax-async` writes one whole-input audio file using the provider-extracted basename instead of `0001.mp3`, `0002.mp3`, ...
 - `--merge` is rejected when `--provider minimax-async` is active because async whole-input jobs already produce one primary audio file.
 - `--provider elevenlabs` supports the shared controls plus provider-local config fields under `providers.elevenlabs`.
 - ElevenLabs-native fields remain config-only in the current CLI. There are no `--el-*` flags in this release.

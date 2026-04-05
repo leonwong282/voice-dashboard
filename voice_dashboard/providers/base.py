@@ -28,6 +28,7 @@ class SynthesisAttachment:
 @dataclass(frozen=True)
 class SynthesisResult:
     audio_bytes: bytes
+    audio_filename: str | None = None
     timestamps: dict[str, Any] | None = None
     attachments: tuple[SynthesisAttachment, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)

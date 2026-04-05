@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import io
+import json
 import os
+import tarfile
 import time
-import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +13,6 @@ import requests
 from voice_dashboard.defaults import (
     MINIMAX_ASYNC_CREATE_URL,
     MINIMAX_ASYNC_QUERY_URL,
-    MINIMAX_FILE_RETRIEVE_CONTENT_URL,
     MINIMAX_FILE_RETRIEVE_URL,
 )
 from voice_dashboard.errors import ApiError, AuthenticationError, RetryableApiError
@@ -35,7 +35,8 @@ _AUDIO_EXTENSIONS = {
     ".pcm",
     ".wav",
 }
-_SUBTITLE_EXTENSIONS = {".ass", ".lrc", ".srt", ".ssa", ".vtt"}
+_TITLES_EXTENSION = ".titles"
+_EXTRA_EXTENSION = ".extra"
 
 
 def _normalize_status(raw_status: object) -> str:
@@ -122,6 +123,40 @@ def _request_with_retries(
     raise ApiError("MiniMax async request failed for an unknown reason.")
 
 
+def _download_from_url(
+    download_url: str,
+    *,
+    timeout_seconds: int,
+    max_retries: int,
+) -> bytes:
+    last_error: RetryableApiError | None = None
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.get(download_url, timeout=timeout_seconds)
+        except requests.RequestException as exc:
+            last_error = RetryableApiError(f"Network error: {exc}")
+        else:
+            if response.status_code >= 500:
+                last_error = RetryableApiError(
+                    f"HTTP {response.status_code}: download_url request failed."
+                )
+            elif response.status_code >= 400:
+                body = response.text.strip() or "download_url request failed."
+                raise ApiError(f"HTTP {response.status_code}: {body}")
+            elif response.content:
+                return response.content
+            else:
+                raise ApiError("MiniMax async download URL returned empty content.")
+
+        if attempt < max_retries:
+            time.sleep(min(attempt, 3))
+
+    if last_error is not None:
+        raise last_error
+    raise ApiError("MiniMax async download failed for an unknown reason.")
+
+
 def _select_archive_member(
     members: list[tuple[str, bytes]],
     *,
@@ -142,24 +177,78 @@ def _select_archive_member(
     return None
 
 
+def _ms_to_srt_time(milliseconds: float | int) -> str:
+    total_ms = max(float(milliseconds), 0.0)
+    total_seconds = int(total_ms // 1000)
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    millis = int(round(total_ms - (total_seconds * 1000)))
+    if millis >= 1000:
+        seconds += 1
+        millis -= 1000
+    if seconds >= 60:
+        minutes += 1
+        seconds -= 60
+    if minutes >= 60:
+        hours += 1
+        minutes -= 60
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{millis:03d}"
+
+
+def _titles_to_srt_bytes(titles_bytes: bytes) -> bytes:
+    try:
+        payload = json.loads(titles_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ApiError("MiniMax .titles file was not valid UTF-8 JSON.") from exc
+
+    items: Any = payload
+    if isinstance(items, dict):
+        for key in ("subtitles", "sentences", "data", "items"):
+            value = items.get(key)
+            if isinstance(value, list):
+                items = value
+                break
+
+    if not isinstance(items, list):
+        raise ApiError("MiniMax .titles file did not contain a subtitle list.")
+
+    lines: list[str] = []
+    for index, item in enumerate(items, start=1):
+        if not isinstance(item, dict):
+            raise ApiError("MiniMax .titles item was not a JSON object.")
+        text = str(item.get("text", "")).strip()
+        if not text:
+            continue
+        try:
+            start = _ms_to_srt_time(float(item["time_begin"]))
+            end = _ms_to_srt_time(float(item["time_end"]))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ApiError(
+                "MiniMax .titles item was missing valid time_begin/time_end fields."
+            ) from exc
+        lines.append(f"{index}\n{start} --> {end}\n{text}\n")
+
+    return "\n".join(lines).encode("utf-8")
+
+
 def _extract_bundle(
     bundle_bytes: bytes,
     settings: MiniMaxAsyncTTSSettings,
-) -> tuple[bytes, tuple[SynthesisAttachment, ...]]:
+) -> tuple[str, bytes, tuple[SynthesisAttachment, ...]]:
     bundle_stream = io.BytesIO(bundle_bytes)
-    if not zipfile.is_zipfile(bundle_stream):
-        if settings.subtitles:
-            raise ApiError(
-                "MiniMax async returned a single file instead of a bundle with subtitles."
-            )
-        return bundle_bytes, ()
-
-    with zipfile.ZipFile(bundle_stream) as archive:
-        members = [
-            (info.filename, archive.read(info.filename))
-            for info in archive.infolist()
-            if not info.is_dir()
-        ]
+    try:
+        with tarfile.open(fileobj=bundle_stream, mode="r:*") as archive:
+            members = []
+            for member in archive.getmembers():
+                if not member.isfile():
+                    continue
+                content = archive.extractfile(member)
+                if content is None:
+                    continue
+                members.append((Path(member.name).name, content.read()))
+    except tarfile.TarError as exc:
+        raise ApiError("MiniMax async bundle was not a valid tar archive.") from exc
 
     if not members:
         raise ApiError("MiniMax async bundle did not contain any files.")
@@ -172,41 +261,45 @@ def _extract_bundle(
     )
     if audio_member is None:
         raise ApiError("MiniMax async bundle did not contain an audio file.")
-    _, audio_bytes = audio_member
+    audio_filename, audio_bytes = audio_member
 
     attachments: list[SynthesisAttachment] = []
 
-    subtitle_member = _select_archive_member(members, suffixes=_SUBTITLE_EXTENSIONS)
-    if settings.subtitles:
-        if subtitle_member is None:
-            raise ApiError(
-                "MiniMax async task completed without a subtitle file."
-            )
-        subtitle_filename, subtitle_bytes = subtitle_member
-        subtitle_suffix = Path(subtitle_filename).suffix.lower() or ".srt"
+    titles_member = _select_archive_member(members, suffixes={_TITLES_EXTENSION})
+    if titles_member is not None:
+        titles_filename, titles_bytes = titles_member
         attachments.append(
             SynthesisAttachment(
-                kind="subtitle",
-                filename=f"output{subtitle_suffix}",
-                content=subtitle_bytes,
+                kind="titles",
+                filename=titles_filename,
+                content=titles_bytes,
             )
         )
+        if settings.subtitles:
+            attachments.append(
+                SynthesisAttachment(
+                    kind="subtitle_srt",
+                    filename="subtitle.srt",
+                    content=_titles_to_srt_bytes(titles_bytes),
+                )
+            )
+    elif settings.subtitles:
+        raise ApiError(
+            "MiniMax async task completed without a .titles subtitle file."
+        )
 
-    extra_member = _select_archive_member(
-        members,
-        suffixes={".json"},
-    )
+    extra_member = _select_archive_member(members, suffixes={_EXTRA_EXTENSION})
     if extra_member is not None:
-        _, extra_bytes = extra_member
+        extra_filename, extra_bytes = extra_member
         attachments.append(
             SynthesisAttachment(
                 kind="extra",
-                filename="output.extra.json",
+                filename=extra_filename,
                 content=extra_bytes,
             )
         )
 
-    return audio_bytes, tuple(attachments)
+    return audio_filename, audio_bytes, tuple(attachments)
 
 
 class MiniMaxAsyncProvider:
@@ -305,22 +398,15 @@ class MiniMaxAsyncProvider:
     def _download_file(
         self,
         *,
-        file_id: int | str,
-        api_key: str,
+        download_url: str,
         timeout_seconds: int,
         max_retries: int,
     ) -> bytes:
-        response = _request_with_retries(
-            "GET",
-            MINIMAX_FILE_RETRIEVE_CONTENT_URL,
-            api_key=api_key,
+        return _download_from_url(
+            download_url,
             timeout_seconds=timeout_seconds,
             max_retries=max_retries,
-            params={"file_id": file_id},
         )
-        if not response.content:
-            raise ApiError("MiniMax file download response did not include file content.")
-        return response.content
 
     def synthesize(
         self,
@@ -386,13 +472,17 @@ class MiniMaxAsyncProvider:
             timeout_seconds=timeout_seconds,
             max_retries=max_retries,
         )
+        download_url = file_payload.get("download_url")
+        if not isinstance(download_url, str) or not download_url.strip():
+            raise ApiError("MiniMax file metadata response did not include download_url.")
         downloaded_bytes = self._download_file(
-            file_id=file_id,
-            api_key=api_key,
+            download_url=download_url.strip(),
             timeout_seconds=timeout_seconds,
             max_retries=max_retries,
         )
-        audio_bytes, attachments = _extract_bundle(downloaded_bytes, settings)
+        audio_filename, audio_bytes, attachments = _extract_bundle(
+            downloaded_bytes, settings
+        )
 
         metadata = {
             "task_id": task_id,
@@ -400,12 +490,13 @@ class MiniMaxAsyncProvider:
             "file_id": file_id,
             "remote_status": remote_status,
             "remote_filename": file_payload.get("filename"),
-            "remote_download_url": file_payload.get("download_url"),
+            "remote_download_url": download_url.strip(),
             "usage_characters": usage_characters,
             "last_status": last_status_payload.get("status"),
         }
         return SynthesisResult(
             audio_bytes=audio_bytes,
+            audio_filename=audio_filename,
             attachments=attachments,
             metadata=metadata,
         )

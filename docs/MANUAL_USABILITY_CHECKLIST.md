@@ -215,10 +215,16 @@ ttsrun --provider minimax-async /tmp/tts-sample.txt
 - Expect:
   - command succeeds
   - `manifest.json.settings.provider` is `minimax-async`
-  - `output.mp3` exists
+  - one extracted provider audio file exists, typically `*.mp3`
+  - one provider subtitle JSON file exists, typically `*.titles`, when subtitle output is returned
+  - one provider extra metadata file exists, typically `*.extra`, when extra output is returned
+  - `subtitle.srt` exists when `providers.minimax-async.subtitles` is `true`
   - `manifest.json.summary.merge_status` is `skipped`
   - `manifest.json.summary.task_id` and `manifest.json.summary.file_id` are present
-  - `manifest.json.summary.subtitle_file` is present when `providers.minimax-async.subtitles` is `true`
+  - `manifest.json.summary.audio_file` is present
+  - `manifest.json.summary.titles_file` is present when subtitle JSON is returned
+  - `manifest.json.summary.extra_file` is present when extra metadata is returned
+  - `manifest.json.summary.subtitle_srt_file` is present when `providers.minimax-async.subtitles` is `true`
   - segment list contains exactly one entry for the whole normalized input
 
 - Run:

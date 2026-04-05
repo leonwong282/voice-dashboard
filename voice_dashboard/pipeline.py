@@ -629,10 +629,10 @@ def run_whole_input_job(
     )
 
     provider = get_provider(provider_name)
-    output_file = f"output.{settings.audio_format}"
-    output_path = output_dir / output_file
-    subtitle_file: str | None = None
+    output_file: str | None = None
+    titles_file: str | None = None
     extra_file: str | None = None
+    subtitle_srt_file: str | None = None
     summary_overrides: dict[str, Any] = {}
     exit_code = ExitCode.OK
 
@@ -657,14 +657,18 @@ def run_whole_input_job(
         }
         reporter.error(f"Whole-input synthesis failed: {exc}")
     else:
+        output_file = result_payload.audio_filename or f"output.{settings.audio_format}"
+        output_path = output_dir / output_file
         write_audio_file(output_path, result_payload.audio_bytes)
         for attachment in result_payload.attachments:
             attachment_path = output_dir / attachment.filename
             write_binary_file(attachment_path, attachment.content)
-            if attachment.kind == "subtitle":
-                subtitle_file = attachment.filename
+            if attachment.kind == "titles":
+                titles_file = attachment.filename
             elif attachment.kind == "extra":
                 extra_file = attachment.filename
+            elif attachment.kind == "subtitle_srt":
+                subtitle_srt_file = attachment.filename
         summary_overrides = dict(result_payload.metadata)
         segment_entry = {
             "index": 1,
@@ -700,8 +704,10 @@ def run_whole_input_job(
             "merge_error": None,
             "cleanup_error": None,
             "cleanup_backup_dir": None,
-            "subtitle_file": subtitle_file,
+            "audio_file": output_file,
+            "titles_file": titles_file,
             "extra_file": extra_file,
+            "subtitle_srt_file": subtitle_srt_file,
             **summary_overrides,
         },
         "segments": [segment_entry],

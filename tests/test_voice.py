@@ -1,9 +1,9 @@
 import io
 import json
 import os
+import tarfile
 import tempfile
 import unittest
-import zipfile
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from subprocess import CompletedProcess
@@ -52,11 +52,13 @@ class MockResponse:
         return self._payload
 
 
-def build_zip_bytes(files: dict[str, bytes]) -> bytes:
+def build_tar_bytes(files: dict[str, bytes]) -> bytes:
     buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w") as archive:
+    with tarfile.open(fileobj=buffer, mode="w") as archive:
         for filename, content in files.items():
-            archive.writestr(filename, content)
+            info = tarfile.TarInfo(name=filename)
+            info.size = len(content)
+            archive.addfile(info, io.BytesIO(content))
     return buffer.getvalue()
 
 
@@ -1512,13 +1514,20 @@ class BatchFlowTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            bundle_bytes = build_zip_bytes(
+            bundle_bytes = build_tar_bytes(
                 {
-                    "audio/output.mp3": b"ASYNC-MP3",
-                    "audio/output.srt": "1\n00:00:00,000 --> 00:00:01,000\n第一段 第二段\n".encode(
-                        "utf-8"
-                    ),
-                    "audio/output.json": json.dumps(
+                    "content-123.mp3": b"ASYNC-MP3",
+                    "content-123.titles": json.dumps(
+                        [
+                            {
+                                "text": "第一段 第二段",
+                                "time_begin": 0,
+                                "time_end": 1000,
+                            }
+                        ],
+                        ensure_ascii=False,
+                    ).encode("utf-8"),
+                    "content-123.extra": json.dumps(
                         {"duration_seconds": 1.23}, ensure_ascii=False
                     ).encode("utf-8"),
                 }
@@ -1547,8 +1556,8 @@ class BatchFlowTests(unittest.TestCase):
                 payload={
                     "file": {
                         "file_id": 456,
-                        "filename": "result_bundle.zip",
-                        "download_url": "https://example.com/result_bundle.zip",
+                        "filename": "result_bundle.tar",
+                        "download_url": "https://example.com/result_bundle.tar",
                     },
                     "base_resp": {"status_code": 0, "status_msg": "success"},
                 },
@@ -1575,17 +1584,20 @@ class BatchFlowTests(unittest.TestCase):
                         )
 
             self.assertEqual(exit_code, ExitCode.OK)
-            self.assertEqual((output_dir / "output.mp3").read_bytes(), b"ASYNC-MP3")
-            self.assertTrue((output_dir / "output.srt").exists())
-            self.assertTrue((output_dir / "output.extra.json").exists())
+            self.assertEqual((output_dir / "content-123.mp3").read_bytes(), b"ASYNC-MP3")
+            self.assertTrue((output_dir / "content-123.titles").exists())
+            self.assertTrue((output_dir / "content-123.extra").exists())
+            self.assertTrue((output_dir / "subtitle.srt").exists())
             manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["settings"]["provider"], "minimax-async")
             self.assertEqual(manifest["summary"]["task_id"], 123)
             self.assertEqual(manifest["summary"]["file_id"], 456)
             self.assertEqual(manifest["summary"]["remote_status"], "success")
-            self.assertEqual(manifest["summary"]["subtitle_file"], "output.srt")
-            self.assertEqual(manifest["summary"]["extra_file"], "output.extra.json")
-            self.assertEqual(manifest["segments"][0]["output_file"], "output.mp3")
+            self.assertEqual(manifest["summary"]["audio_file"], "content-123.mp3")
+            self.assertEqual(manifest["summary"]["titles_file"], "content-123.titles")
+            self.assertEqual(manifest["summary"]["extra_file"], "content-123.extra")
+            self.assertEqual(manifest["summary"]["subtitle_srt_file"], "subtitle.srt")
+            self.assertEqual(manifest["segments"][0]["output_file"], "content-123.mp3")
             self.assertEqual(manifest["segments"][0]["timestamp_status"], "skipped")
             self.assertEqual(
                 mock_post.call_args.kwargs["json"]["audio_setting"]["audio_sample_rate"],
@@ -1596,6 +1608,14 @@ class BatchFlowTests(unittest.TestCase):
                 "mp3",
             )
             self.assertEqual(mock_get.call_count, 3)
+            self.assertEqual(
+                mock_get.call_args_list[2].args[0],
+                "https://example.com/result_bundle.tar",
+            )
+            self.assertNotIn("headers", mock_get.call_args_list[2].kwargs)
+            subtitle_srt = (output_dir / "subtitle.srt").read_text(encoding="utf-8")
+            self.assertIn("00:00:00,000 --> 00:00:01,000", subtitle_srt)
+            self.assertIn("第一段 第二段", subtitle_srt)
 
     def test_minimax_async_missing_subtitle_fails_when_requested(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1618,10 +1638,10 @@ class BatchFlowTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            bundle_bytes = build_zip_bytes(
+            bundle_bytes = build_tar_bytes(
                 {
-                    "audio/output.mp3": b"ASYNC-MP3",
-                    "audio/output.json": json.dumps({"duration_seconds": 1.23}).encode(
+                    "content-123.mp3": b"ASYNC-MP3",
+                    "content-123.extra": json.dumps({"duration_seconds": 1.23}).encode(
                         "utf-8"
                     ),
                 }
@@ -1648,7 +1668,11 @@ class BatchFlowTests(unittest.TestCase):
             retrieve_response = MockResponse(
                 200,
                 payload={
-                    "file": {"file_id": 456, "filename": "result_bundle.zip"},
+                    "file": {
+                        "file_id": 456,
+                        "filename": "result_bundle.tar",
+                        "download_url": "https://example.com/result_bundle.tar",
+                    },
                     "base_resp": {"status_code": 0, "status_msg": "success"},
                 },
             )
@@ -1677,7 +1701,7 @@ class BatchFlowTests(unittest.TestCase):
             manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["settings"]["provider"], "minimax-async")
             self.assertEqual(manifest["summary"]["failed"], 1)
-            self.assertIn("subtitle file", manifest["segments"][0]["error"])
+            self.assertIn(".titles subtitle file", manifest["segments"][0]["error"])
             errors_lines = (output_dir / "errors.jsonl").read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(errors_lines), 1)
 
