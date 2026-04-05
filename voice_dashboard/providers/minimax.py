@@ -6,6 +6,7 @@ import requests
 
 from voice_dashboard.defaults import API_URL
 from voice_dashboard.errors import ApiError, AuthenticationError, RetryableApiError
+from voice_dashboard.providers.base import MiniMaxTTSSettings
 
 
 def extract_api_error_message(response: requests.Response) -> str:
@@ -59,7 +60,7 @@ class MiniMaxProvider:
         self,
         *,
         text: str,
-        settings: object,
+        settings: MiniMaxTTSSettings,
         api_key: str,
         timeout_seconds: int,
     ) -> bytes:

@@ -4,6 +4,8 @@ This checklist turns the ElevenLabs TTS support plan into an execution sequence 
 
 Use this document together with [docs/ELEVENLABS_SUPPORT_PLAN.md](./ELEVENLABS_SUPPORT_PLAN.md).
 
+For the post-MVP next-stage checklist, see [docs/ELEVENLABS_NEXT_IMPLEMENTATION_CHECKLIST.md](./ELEVENLABS_NEXT_IMPLEMENTATION_CHECKLIST.md).
+
 ## 1. Working Assumptions
 
 - The tool remains TTS-only.

@@ -22,21 +22,14 @@ from voice_dashboard.errors import (
 )
 from voice_dashboard.input_sources import InputSource
 from voice_dashboard.providers import DEFAULT_PROVIDER_NAME, get_provider
+from voice_dashboard.providers.base import (
+    ProviderTTSSettings,
+    serialize_runtime_settings,
+)
 from voice_dashboard.providers.minimax import requests as provider_requests
 
 # Compatibility alias for existing tests that patch `voice_dashboard.pipeline.requests.post`.
 requests = provider_requests
-
-
-@dataclass(frozen=True)
-class TTSSettings:
-    model: str
-    language_boost: str
-    voice_id: str
-    speed: float
-    pitch: int
-    sample_rate: int
-    audio_format: str
 
 
 @dataclass(frozen=True)
@@ -95,7 +88,7 @@ def get_api_key(provider_name: str = DEFAULT_PROVIDER_NAME) -> str:
 
 def synthesize_segment(
     text: str,
-    settings: TTSSettings,
+    settings: ProviderTTSSettings,
     api_key: str,
     request_settings: RequestSettings | None = None,
     reporter: ProgressReporter | None = None,
@@ -382,7 +375,7 @@ def open_output_dir(output_dir: Path) -> None:
 def run_batch_job(
     source: InputSource,
     output_dir: Path,
-    settings: TTSSettings,
+    settings: ProviderTTSSettings,
     request_settings: RequestSettings | None,
     api_key: str,
     merge: bool,
@@ -400,7 +393,9 @@ def run_batch_job(
     reporter.info(f"Output directory: {output_dir.resolve()}")
     reporter.detail(
         "Settings: "
-        + json.dumps(asdict(settings), ensure_ascii=False, sort_keys=True)
+        + json.dumps(
+            serialize_runtime_settings(settings), ensure_ascii=False, sort_keys=True
+        )
     )
     reporter.detail(
         "Request settings: "
@@ -504,7 +499,7 @@ def run_batch_job(
         "created_at": datetime.now().astimezone().isoformat(),
         "settings": {
             "provider": provider_name,
-            **asdict(settings),
+            **serialize_runtime_settings(settings),
         },
         "summary": {
             "total_segments": len(segments),

@@ -1,6 +1,78 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
+from dataclasses import asdict, dataclass
+from typing import Protocol
+
+
+@dataclass(frozen=True)
+class CommonTTSSettings:
+    model: str
+    voice_id: str
+    speed: float
+    audio_format: str
+
+
+@dataclass(frozen=True)
+class MiniMaxTTSSettings:
+    common: CommonTTSSettings
+    language_boost: str
+    pitch: int
+    sample_rate: int
+
+    @property
+    def model(self) -> str:
+        return self.common.model
+
+    @property
+    def voice_id(self) -> str:
+        return self.common.voice_id
+
+    @property
+    def speed(self) -> float:
+        return self.common.speed
+
+    @property
+    def audio_format(self) -> str:
+        return self.common.audio_format
+
+
+@dataclass(frozen=True)
+class ElevenLabsTTSSettings:
+    common: CommonTTSSettings
+
+    @property
+    def model(self) -> str:
+        return self.common.model
+
+    @property
+    def voice_id(self) -> str:
+        return self.common.voice_id
+
+    @property
+    def speed(self) -> float:
+        return self.common.speed
+
+    @property
+    def audio_format(self) -> str:
+        return self.common.audio_format
+
+
+ProviderTTSSettings = MiniMaxTTSSettings | ElevenLabsTTSSettings
+
+
+def serialize_runtime_settings(settings: ProviderTTSSettings) -> dict[str, object]:
+    payload = asdict(settings.common)
+
+    if isinstance(settings, MiniMaxTTSSettings):
+        payload.update(
+            {
+                "language_boost": settings.language_boost,
+                "pitch": settings.pitch,
+                "sample_rate": settings.sample_rate,
+            }
+        )
+
+    return payload
 
 
 class TTSProvider(Protocol):
@@ -16,7 +88,7 @@ class TTSProvider(Protocol):
         self,
         *,
         text: str,
-        settings: Any,
+        settings: ProviderTTSSettings,
         api_key: str,
         timeout_seconds: int,
     ) -> bytes:

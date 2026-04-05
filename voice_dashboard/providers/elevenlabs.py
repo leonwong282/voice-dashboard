@@ -9,6 +9,7 @@ from voice_dashboard.defaults import (
     ELEVENLABS_DEFAULT_MODEL,
 )
 from voice_dashboard.errors import ApiError, AuthenticationError, RetryableApiError
+from voice_dashboard.providers.base import ElevenLabsTTSSettings
 
 
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech"
@@ -65,7 +66,7 @@ class ElevenLabsProvider:
         self,
         *,
         text: str,
-        settings: object,
+        settings: ElevenLabsTTSSettings,
         api_key: str,
         timeout_seconds: int,
     ) -> bytes:

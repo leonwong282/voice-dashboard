@@ -15,9 +15,6 @@ from voice_dashboard.config import (
 )
 from voice_dashboard.defaults import (
     DEFAULT_FORMAT,
-    DEFAULT_LANGUAGE_BOOST,
-    DEFAULT_PITCH,
-    DEFAULT_SAMPLE_RATE,
 )
 from voice_dashboard.errors import (
     ConfigError,
@@ -36,7 +33,6 @@ from voice_dashboard.input_sources import (
 from voice_dashboard.pipeline import (
     ProgressReporter,
     RequestSettings,
-    TTSSettings,
     build_output_dir,
     detect_output_dir_opener,
     find_ffmpeg_path,
@@ -44,6 +40,12 @@ from voice_dashboard.pipeline import (
     open_output_dir,
     prepare_output_dir,
     run_batch_job,
+)
+from voice_dashboard.providers.base import (
+    CommonTTSSettings,
+    ElevenLabsTTSSettings,
+    MiniMaxTTSSettings,
+    ProviderTTSSettings,
 )
 from voice_dashboard.providers.registry import (
     DEFAULT_PROVIDER_NAME,
@@ -320,30 +322,31 @@ def resolve_settings(
     args: argparse.Namespace,
     config: AppConfig,
     provider_name: str,
-) -> TTSSettings:
+) -> ProviderTTSSettings:
     provider_config = config.provider_config(provider_name)
-    language_boost = DEFAULT_LANGUAGE_BOOST
-    pitch = DEFAULT_PITCH
-    sample_rate = DEFAULT_SAMPLE_RATE
-
-    if provider_name == "minimax":
-        language_boost = args.language_boost or config.minimax.language_boost
-        pitch = args.pitch if args.pitch is not None else config.minimax.pitch
-        sample_rate = (
-            args.sample_rate
-            if args.sample_rate is not None
-            else config.minimax.sample_rate
-        )
-
-    return TTSSettings(
+    common = CommonTTSSettings(
         model=args.model or provider_config.model,
-        language_boost=language_boost,
         voice_id=args.voice_id or provider_config.voice_id,
         speed=args.speed if args.speed is not None else provider_config.speed,
-        pitch=pitch,
-        sample_rate=sample_rate,
         audio_format=args.format or config.audio_format,
     )
+
+    if provider_name == "minimax":
+        return MiniMaxTTSSettings(
+            common=common,
+            language_boost=args.language_boost or config.minimax.language_boost,
+            pitch=args.pitch if args.pitch is not None else config.minimax.pitch,
+            sample_rate=(
+                args.sample_rate
+                if args.sample_rate is not None
+                else config.minimax.sample_rate
+            ),
+        )
+
+    if provider_name == "elevenlabs":
+        return ElevenLabsTTSSettings(common=common)
+
+    raise ConfigError(f"Unsupported provider: {provider_name}")
 
 
 def resolve_request_settings(

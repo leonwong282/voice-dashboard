@@ -6,6 +6,8 @@ This analysis was checked against the official ElevenLabs documentation on April
 
 For an execution-oriented task list, see [docs/ELEVENLABS_IMPLEMENTATION_CHECKLIST.md](./ELEVENLABS_IMPLEMENTATION_CHECKLIST.md).
 
+For the post-MVP next-stage roadmap from the current codebase state, see [docs/ELEVENLABS_NEXT_ROADMAP.md](./ELEVENLABS_NEXT_ROADMAP.md).
+
 ## 1. Scope Clarification
 
 `voice-dashboard` is a TTS execution tool only.

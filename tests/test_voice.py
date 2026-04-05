@@ -1292,6 +1292,48 @@ class BatchFlowTests(unittest.TestCase):
                 mock_post.call_args.kwargs["json"]["model_id"],
                 "eleven_multilingual_v2",
             )
+            self.assertNotIn("language_boost", manifest["settings"])
+            self.assertNotIn("pitch", manifest["settings"])
+            self.assertNotIn("sample_rate", manifest["settings"])
+
+    def test_elevenlabs_verbose_settings_do_not_include_minimax_only_fields(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            input_path.write_text("第一段", encoding="utf-8")
+            response = MockResponse(200, content=b"ELVN")
+            stderr_buffer = io.StringIO()
+
+            with patch.dict(
+                os.environ,
+                build_test_env(ELEVENLABS_API_KEY="test-key"),
+                clear=True,
+            ):
+                with patch(
+                    "voice_dashboard.providers.elevenlabs.requests.post",
+                    return_value=response,
+                ):
+                    with redirect_stderr(stderr_buffer):
+                        exit_code = cli.main(
+                            [
+                                str(input_path),
+                                "--provider",
+                                "elevenlabs",
+                                "--voice-id",
+                                "voice-123",
+                                "--model",
+                                "eleven-model",
+                                "--output-dir",
+                                str(output_dir),
+                                "--verbose",
+                            ]
+                        )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertIn("Settings:", stderr_buffer.getvalue())
+            self.assertNotIn("language_boost", stderr_buffer.getvalue())
+            self.assertNotIn("pitch", stderr_buffer.getvalue())
+            self.assertNotIn("sample_rate", stderr_buffer.getvalue())
 
     def test_elevenlabs_auth_failure_returns_auth_exit_code(self):
         with tempfile.TemporaryDirectory() as temp_dir:
