@@ -525,4 +525,4 @@ Open output folder after completion:
 pbpaste | ttsrun --stdin --merge --open
 ```
 
-For release-style manual verification, use [docs/MANUAL_USABILITY_CHECKLIST.md](/Users/liang/Downloads/repository/voice-dashboard/docs/MANUAL_USABILITY_CHECKLIST.md).
+For release-style manual verification, use [docs/MANUAL_USABILITY_CHECKLIST.md](./MANUAL_USABILITY_CHECKLIST.md).
