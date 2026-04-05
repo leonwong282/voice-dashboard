@@ -45,6 +45,17 @@ Prepare a config file:
       "language_boost": "Chinese,Yue",
       "sample_rate": 32000
     },
+    "minimax-async": {
+      "voice_id": "your_minimax_async_voice_id",
+      "speed": 1.0,
+      "model": "speech-2.8-hd",
+      "pitch": 0,
+      "language_boost": "auto",
+      "sample_rate": 32000,
+      "subtitles": true,
+      "poll_interval_seconds": 2,
+      "task_timeout_seconds": 900
+    },
     "elevenlabs": {
       "voice_id": "your_elevenlabs_voice_id",
       "speed": 1.0,
@@ -88,6 +99,7 @@ export ELEVENLABS_API_KEY="your_elevenlabs_key"
   - `default_provider`
   - `global`
   - `providers.minimax`
+  - `providers.minimax-async`
   - `providers.elevenlabs`
 - Confirm both providers have their own `voice_id`, `model`, and `speed`
 - Confirm `providers.elevenlabs` also carries its provider-local fields if you configured them
@@ -109,6 +121,12 @@ export ELEVENLABS_API_KEY="your_elevenlabs_key"
   - active provider changes to `elevenlabs`
   - `ELEVENLABS_API_KEY` is required and shown as `ok`
   - `MINIMAX_API_KEY` is informational
+
+- Run `ttsrun doctor --provider minimax-async`
+- Expect:
+  - active provider changes to `minimax-async`
+  - `MINIMAX_API_KEY` is required and shown as `ok`
+  - `ELEVENLABS_API_KEY` is informational
 
 ## 4. MiniMax Default Config Path
 
@@ -185,6 +203,33 @@ ttsrun --provider elevenlabs --sample-rate 32000 /tmp/tts-sample.txt
 - Expect:
   - each command exits with usage error
   - each error clearly says the flag can only be used with `--provider=minimax`
+
+## 8.1 MiniMax Async Whole-Input Flow
+
+- Run:
+
+```bash
+ttsrun --provider minimax-async /tmp/tts-sample.txt
+```
+
+- Expect:
+  - command succeeds
+  - `manifest.json.settings.provider` is `minimax-async`
+  - `output.mp3` exists
+  - `manifest.json.summary.merge_status` is `skipped`
+  - `manifest.json.summary.task_id` and `manifest.json.summary.file_id` are present
+  - `manifest.json.summary.subtitle_file` is present when `providers.minimax-async.subtitles` is `true`
+  - segment list contains exactly one entry for the whole normalized input
+
+- Run:
+
+```bash
+ttsrun --provider minimax-async /tmp/tts-sample.txt --merge
+```
+
+- Expect:
+  - command exits with usage error
+  - error says `--merge` cannot be used with `--provider=minimax-async`
 
 ## 9. Output Directory Behavior
 

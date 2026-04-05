@@ -40,11 +40,13 @@ from voice_dashboard.pipeline import (
     open_output_dir,
     prepare_output_dir,
     run_batch_job,
+    run_whole_input_job,
 )
 from voice_dashboard.providers.base import (
     CommonTTSSettings,
     ElevenLabsVoiceSettings,
     ElevenLabsTTSSettings,
+    MiniMaxAsyncTTSSettings,
     MiniMaxTTSSettings,
     ProviderTTSSettings,
 )
@@ -335,6 +337,25 @@ def resolve_settings(
         audio_format=args.format or config.audio_format,
     )
 
+    if provider_name == "minimax-async":
+        return MiniMaxAsyncTTSSettings(
+            common=common,
+            language_boost=args.language_boost or config.minimax_async.language_boost,
+            pitch=(
+                args.pitch
+                if args.pitch is not None
+                else config.minimax_async.pitch
+            ),
+            sample_rate=(
+                args.sample_rate
+                if args.sample_rate is not None
+                else config.minimax_async.sample_rate
+            ),
+            subtitles=config.minimax_async.subtitles,
+            poll_interval_seconds=config.minimax_async.poll_interval_seconds,
+            task_timeout_seconds=config.minimax_async.task_timeout_seconds,
+        )
+
     if is_minimax_provider_name(provider_name):
         return MiniMaxTTSSettings(
             common=common,
@@ -615,6 +636,9 @@ def run_batch_command(
     config = load_config(args.config)
     provider_name = resolve_provider(args, config)
     validate_provider_options(parser, args, provider_name)
+    provider = get_registered_provider(provider_name)
+    if provider.execution_mode == "whole_input" and args.merge:
+        parser.error(f"--merge cannot be used with --provider={provider_name}.")
     source = resolve_input_source(parser, args)
     settings = resolve_settings(args, config, provider_name)
     request_settings = resolve_request_settings(args, config)
@@ -632,7 +656,8 @@ def run_batch_command(
         explicit=bool(args.output_dir),
         overwrite=args.force_output_dir,
     )
-    result = run_batch_job(
+    run_job = run_whole_input_job if provider.execution_mode == "whole_input" else run_batch_job
+    result = run_job(
         source=source,
         output_dir=output_dir,
         settings=settings,

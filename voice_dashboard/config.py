@@ -14,6 +14,9 @@ from voice_dashboard.defaults import (
     ELEVENLABS_DEFAULT_OUTPUT_FORMAT,
     ELEVENLABS_DEFAULT_SPEED,
     ELEVENLABS_DEFAULT_VOICE_ID,
+    MINIMAX_ASYNC_DEFAULT_POLL_INTERVAL_SECONDS,
+    MINIMAX_ASYNC_DEFAULT_SUBTITLES,
+    MINIMAX_ASYNC_DEFAULT_TASK_TIMEOUT_SECONDS,
     MINIMAX_DEFAULT_MODEL,
     MINIMAX_DEFAULT_SPEED,
     MINIMAX_DEFAULT_VOICE_ID,
@@ -49,6 +52,19 @@ class MiniMaxConfig:
 
 
 @dataclass(frozen=True)
+class MiniMaxAsyncConfig:
+    voice_id: str = MINIMAX_DEFAULT_VOICE_ID
+    speed: float = MINIMAX_DEFAULT_SPEED
+    model: str = MINIMAX_DEFAULT_MODEL
+    pitch: int = DEFAULT_PITCH
+    language_boost: str = DEFAULT_LANGUAGE_BOOST
+    sample_rate: int = DEFAULT_SAMPLE_RATE
+    subtitles: bool = MINIMAX_ASYNC_DEFAULT_SUBTITLES
+    poll_interval_seconds: int = MINIMAX_ASYNC_DEFAULT_POLL_INTERVAL_SECONDS
+    task_timeout_seconds: int = MINIMAX_ASYNC_DEFAULT_TASK_TIMEOUT_SECONDS
+
+
+@dataclass(frozen=True)
 class ElevenLabsConfig:
     voice_id: str = ELEVENLABS_DEFAULT_VOICE_ID
     speed: float = ELEVENLABS_DEFAULT_SPEED
@@ -78,6 +94,7 @@ class AppConfig:
     default_provider: str = DEFAULT_PROVIDER_NAME
     global_options: GlobalConfig = field(default_factory=GlobalConfig)
     minimax: MiniMaxConfig = field(default_factory=MiniMaxConfig)
+    minimax_async: MiniMaxAsyncConfig = field(default_factory=MiniMaxAsyncConfig)
     elevenlabs: ElevenLabsConfig = field(default_factory=ElevenLabsConfig)
     config_path: Path = field(default_factory=default_config_path)
 
@@ -105,7 +122,12 @@ class AppConfig:
     def open_after_finish(self) -> bool:
         return self.global_options.open_after_finish
 
-    def provider_config(self, provider_name: str) -> MiniMaxConfig | ElevenLabsConfig:
+    def provider_config(
+        self,
+        provider_name: str,
+    ) -> MiniMaxConfig | MiniMaxAsyncConfig | ElevenLabsConfig:
+        if provider_name == "minimax-async":
+            return self.minimax_async
         if is_minimax_provider_name(provider_name):
             return self.minimax
         if provider_name == "elevenlabs":
@@ -234,6 +256,7 @@ def serialize_config(
         },
         "providers": {
             "minimax": asdict(config.minimax),
+            "minimax-async": asdict(config.minimax_async),
             "elevenlabs": asdict(config.elevenlabs),
         },
     }
@@ -299,7 +322,7 @@ def load_config(config_path: str | None) -> AppConfig:
     global_values = _expect_object(global_values, "global")
     providers_values = _expect_object(providers_values, "providers")
 
-    supported_provider_sections = {"minimax", "elevenlabs"}
+    supported_provider_sections = {"minimax", "minimax-async", "elevenlabs"}
     unknown_provider_keys = set(providers_values) - supported_provider_sections
     if unknown_provider_keys:
         unknown = ", ".join(sorted(unknown_provider_keys))
@@ -312,6 +335,7 @@ def load_config(config_path: str | None) -> AppConfig:
     app_updates: dict[str, Any] = {}
     global_updates: dict[str, Any] = {}
     minimax_updates: dict[str, Any] = {}
+    minimax_async_updates: dict[str, Any] = {}
     elevenlabs_updates: dict[str, Any] = {}
 
     if "default_provider" in payload:
@@ -364,6 +388,51 @@ def load_config(config_path: str | None) -> AppConfig:
     if "sample_rate" in minimax_values:
         minimax_updates["sample_rate"] = _coerce_int(
             minimax_values["sample_rate"], "providers.minimax.sample_rate"
+        )
+
+    minimax_async_values = providers_values.get("minimax-async", {})
+    minimax_async_values = _expect_object(
+        minimax_async_values, "providers.minimax-async"
+    )
+    if "voice_id" in minimax_async_values:
+        minimax_async_updates["voice_id"] = _coerce_str(
+            minimax_async_values["voice_id"], "providers.minimax-async.voice_id"
+        )
+    if "speed" in minimax_async_values:
+        minimax_async_updates["speed"] = _coerce_float(
+            minimax_async_values["speed"], "providers.minimax-async.speed"
+        )
+    if "model" in minimax_async_values:
+        minimax_async_updates["model"] = _coerce_str(
+            minimax_async_values["model"], "providers.minimax-async.model"
+        )
+    if "pitch" in minimax_async_values:
+        minimax_async_updates["pitch"] = _coerce_int(
+            minimax_async_values["pitch"], "providers.minimax-async.pitch"
+        )
+    if "language_boost" in minimax_async_values:
+        minimax_async_updates["language_boost"] = _coerce_str(
+            minimax_async_values["language_boost"],
+            "providers.minimax-async.language_boost",
+        )
+    if "sample_rate" in minimax_async_values:
+        minimax_async_updates["sample_rate"] = _coerce_int(
+            minimax_async_values["sample_rate"],
+            "providers.minimax-async.sample_rate",
+        )
+    if "subtitles" in minimax_async_values:
+        minimax_async_updates["subtitles"] = _coerce_bool(
+            minimax_async_values["subtitles"], "providers.minimax-async.subtitles"
+        )
+    if "poll_interval_seconds" in minimax_async_values:
+        minimax_async_updates["poll_interval_seconds"] = _coerce_positive_int(
+            minimax_async_values["poll_interval_seconds"],
+            "providers.minimax-async.poll_interval_seconds",
+        )
+    if "task_timeout_seconds" in minimax_async_values:
+        minimax_async_updates["task_timeout_seconds"] = _coerce_positive_int(
+            minimax_async_values["task_timeout_seconds"],
+            "providers.minimax-async.task_timeout_seconds",
         )
 
     elevenlabs_values = providers_values.get("elevenlabs", {})
@@ -446,6 +515,9 @@ def load_config(config_path: str | None) -> AppConfig:
         **{**asdict(config.global_options), **global_updates}
     )
     merged["minimax"] = MiniMaxConfig(**{**asdict(config.minimax), **minimax_updates})
+    merged["minimax_async"] = MiniMaxAsyncConfig(
+        **{**asdict(config.minimax_async), **minimax_async_updates}
+    )
     merged["elevenlabs"] = ElevenLabsConfig(
         **{
             **asdict(config.elevenlabs),

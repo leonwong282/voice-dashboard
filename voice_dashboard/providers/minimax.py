@@ -51,6 +51,7 @@ def decode_audio_hex(audio_hex: str) -> bytes:
 class MiniMaxProvider:
     name = "minimax"
     api_key_env_var = "MINIMAX_API_KEY"
+    execution_mode = "segment"
 
     def read_api_key(self) -> str:
         api_key = os.getenv(self.api_key_env_var, "").strip()
@@ -67,6 +68,7 @@ class MiniMaxProvider:
         settings: MiniMaxTTSSettings,
         api_key: str,
         timeout_seconds: int,
+        max_retries: int = 1,
         context: SegmentSynthesisContext | None = None,
     ) -> SynthesisResult:
         headers = {

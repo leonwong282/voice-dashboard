@@ -85,6 +85,10 @@ def parse_segments(text: str) -> list[str]:
     return [segment.strip() for segment in segments if segment.strip()]
 
 
+def normalize_whole_input(text: str) -> str:
+    return text.replace("\r\n", "\n").replace("\r", "\n").strip()
+
+
 def get_api_key(provider_name: str = DEFAULT_PROVIDER_NAME) -> str:
     return get_provider(provider_name).read_api_key()
 
@@ -108,6 +112,7 @@ def synthesize_segment(
                 settings=settings,
                 api_key=api_key,
                 timeout_seconds=request_settings.timeout_seconds,
+                max_retries=request_settings.max_retries,
                 context=context,
             )
         except RetryableApiError as exc:
@@ -130,6 +135,10 @@ def synthesize_segment(
 
 def write_audio_file(output_path: Path, audio_bytes: bytes) -> None:
     output_path.write_bytes(audio_bytes)
+
+
+def write_binary_file(output_path: Path, content: bytes) -> None:
+    output_path.write_bytes(content)
 
 
 def write_timestamp_file(output_path: Path, payload: dict[str, Any]) -> None:
@@ -574,6 +583,138 @@ def run_batch_job(
         exit_code = merge_exit_code or ExitCode.RUNTIME
     elif merge and cleanup_status not in ("success", "skipped"):
         exit_code = ExitCode.RUNTIME
+
+    return BatchResult(
+        exit_code=int(exit_code),
+        output_dir=output_dir,
+        manifest=manifest,
+    )
+
+
+def run_whole_input_job(
+    source: InputSource,
+    output_dir: Path,
+    settings: ProviderTTSSettings,
+    request_settings: RequestSettings | None,
+    api_key: str,
+    merge: bool,
+    reporter: ProgressReporter | None = None,
+    provider_name: str = DEFAULT_PROVIDER_NAME,
+) -> BatchResult:
+    del merge
+    reporter = reporter or ProgressReporter()
+    request_settings = request_settings or RequestSettings()
+    normalized_text = normalize_whole_input(source.text)
+    if not normalized_text:
+        raise TTSBatchError("No non-empty text found in the provided input.")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    reporter.info(
+        f"Loaded whole-input job from {source.kind} ({len(normalized_text)} characters)"
+    )
+    reporter.info(f"Output directory: {output_dir.resolve()}")
+    common_settings = serialize_common_settings(settings)
+    provider_settings = serialize_provider_settings(settings)
+    reporter.detail(
+        "Common settings: "
+        + json.dumps(common_settings, ensure_ascii=False, sort_keys=True)
+    )
+    reporter.detail(
+        "Provider settings: "
+        + json.dumps(provider_settings, ensure_ascii=False, sort_keys=True)
+    )
+    reporter.detail(
+        "Request settings: "
+        + json.dumps(asdict(request_settings), ensure_ascii=False, sort_keys=True)
+    )
+
+    provider = get_provider(provider_name)
+    output_file = f"output.{settings.audio_format}"
+    output_path = output_dir / output_file
+    subtitle_file: str | None = None
+    extra_file: str | None = None
+    summary_overrides: dict[str, Any] = {}
+    exit_code = ExitCode.OK
+
+    try:
+        result_payload = provider.synthesize(
+            text=normalized_text,
+            settings=settings,
+            api_key=api_key,
+            timeout_seconds=request_settings.timeout_seconds,
+            max_retries=request_settings.max_retries,
+        )
+    except TTSBatchError as exc:
+        exit_code = exit_code_for_error(exc)
+        segment_entry = {
+            "index": 1,
+            "text": normalized_text,
+            "output_file": None,
+            "timestamp_file": None,
+            "timestamp_status": "skipped",
+            "status": "failed",
+            "error": str(exc),
+        }
+        reporter.error(f"Whole-input synthesis failed: {exc}")
+    else:
+        write_audio_file(output_path, result_payload.audio_bytes)
+        for attachment in result_payload.attachments:
+            attachment_path = output_dir / attachment.filename
+            write_binary_file(attachment_path, attachment.content)
+            if attachment.kind == "subtitle":
+                subtitle_file = attachment.filename
+            elif attachment.kind == "extra":
+                extra_file = attachment.filename
+        summary_overrides = dict(result_payload.metadata)
+        segment_entry = {
+            "index": 1,
+            "text": normalized_text,
+            "output_file": output_file,
+            "timestamp_file": None,
+            "timestamp_status": "skipped",
+            "status": "success",
+            "error": None,
+        }
+        reporter.info(f"Wrote {output_file}")
+
+    manifest = {
+        "input_source": source.kind,
+        "input_file": source.input_file,
+        "created_at": datetime.now().astimezone().isoformat(),
+        "settings": {
+            "provider": provider_name,
+            "common_settings": common_settings,
+            "provider_settings": provider_settings,
+        },
+        "summary": {
+            "total_segments": 1,
+            "succeeded": 1 if segment_entry["status"] == "success" else 0,
+            "failed": 1 if segment_entry["status"] == "failed" else 0,
+            "output_dir": str(output_dir.resolve()),
+            "request_timeout_seconds": request_settings.timeout_seconds,
+            "max_retries": request_settings.max_retries,
+            "merged_output_file": None,
+            "merge_status": "skipped",
+            "deleted_segment_files": 0,
+            "cleanup_status": "skipped",
+            "merge_error": None,
+            "cleanup_error": None,
+            "cleanup_backup_dir": None,
+            "subtitle_file": subtitle_file,
+            "extra_file": extra_file,
+            **summary_overrides,
+        },
+        "segments": [segment_entry],
+    }
+    write_manifest(output_dir, manifest)
+    write_errors_file(output_dir, [segment_entry])
+
+    reporter.info(
+        "Finished whole-input job. "
+        f"Success: {manifest['summary']['succeeded']}, "
+        f"Failed: {manifest['summary']['failed']}, "
+        f"Manifest: {output_dir / 'manifest.json'}"
+    )
 
     return BatchResult(
         exit_code=int(exit_code),

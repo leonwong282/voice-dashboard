@@ -93,6 +93,7 @@ def build_timestamp_payload(data: dict[str, object]) -> dict[str, object]:
 class ElevenLabsProvider:
     name = "elevenlabs"
     api_key_env_var = "ELEVENLABS_API_KEY"
+    execution_mode = "segment"
 
     def read_api_key(self) -> str:
         api_key = os.getenv(self.api_key_env_var, "").strip()
@@ -109,6 +110,7 @@ class ElevenLabsProvider:
         settings: ElevenLabsTTSSettings,
         api_key: str,
         timeout_seconds: int,
+        max_retries: int = 1,
         context: SegmentSynthesisContext | None = None,
     ) -> SynthesisResult:
         model_id = settings.model

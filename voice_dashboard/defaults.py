@@ -2,7 +2,11 @@ import os
 from pathlib import Path
 
 
-API_URL = "https://api.minimaxi.com/v1/t2a_v2"
+MINIMAX_SYNC_API_URL = "https://api.minimaxi.com/v1/t2a_v2"
+MINIMAX_ASYNC_CREATE_URL = "https://api.minimaxi.com/v1/t2a_async_v2"
+MINIMAX_ASYNC_QUERY_URL = "https://api.minimaxi.com/v1/query/t2a_async_query_v2"
+MINIMAX_FILE_RETRIEVE_URL = "https://api.minimaxi.com/v1/files/retrieve"
+MINIMAX_FILE_RETRIEVE_CONTENT_URL = "https://api.minimaxi.com/v1/files/retrieve_content"
 APP_DIR_NAME = "voice-dashboard"
 MINIMAX_DEFAULT_MODEL = "speech-2.8-hd"
 DEFAULT_LANGUAGE_BOOST = "Chinese,Yue"
@@ -10,6 +14,9 @@ MINIMAX_DEFAULT_VOICE_ID = "clone_voice_can"
 MINIMAX_DEFAULT_SPEED = 1.2
 DEFAULT_PITCH = 0
 DEFAULT_SAMPLE_RATE = 32000
+MINIMAX_ASYNC_DEFAULT_SUBTITLES = True
+MINIMAX_ASYNC_DEFAULT_POLL_INTERVAL_SECONDS = 2
+MINIMAX_ASYNC_DEFAULT_TASK_TIMEOUT_SECONDS = 900
 ELEVENLABS_DEFAULT_MODEL = "eleven_multilingual_v2"
 ELEVENLABS_DEFAULT_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
 ELEVENLABS_DEFAULT_SPEED = 1.0
@@ -19,6 +26,7 @@ DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_RETRIES = 3
 
 # Backward-compatible aliases for internal imports.
+API_URL = MINIMAX_SYNC_API_URL
 DEFAULT_MODEL = MINIMAX_DEFAULT_MODEL
 DEFAULT_VOICE_ID = MINIMAX_DEFAULT_VOICE_ID
 DEFAULT_SPEED = MINIMAX_DEFAULT_SPEED

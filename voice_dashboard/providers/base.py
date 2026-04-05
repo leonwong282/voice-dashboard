@@ -19,9 +19,18 @@ class SegmentSynthesisContext:
 
 
 @dataclass(frozen=True)
+class SynthesisAttachment:
+    kind: str
+    filename: str
+    content: bytes
+
+
+@dataclass(frozen=True)
 class SynthesisResult:
     audio_bytes: bytes
     timestamps: dict[str, Any] | None = None
+    attachments: tuple[SynthesisAttachment, ...] = ()
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -30,6 +39,33 @@ class MiniMaxTTSSettings:
     language_boost: str
     pitch: int
     sample_rate: int
+
+    @property
+    def model(self) -> str:
+        return self.common.model
+
+    @property
+    def voice_id(self) -> str:
+        return self.common.voice_id
+
+    @property
+    def speed(self) -> float:
+        return self.common.speed
+
+    @property
+    def audio_format(self) -> str:
+        return self.common.audio_format
+
+
+@dataclass(frozen=True)
+class MiniMaxAsyncTTSSettings:
+    common: CommonTTSSettings
+    language_boost: str
+    pitch: int
+    sample_rate: int
+    subtitles: bool
+    poll_interval_seconds: int
+    task_timeout_seconds: int
 
     @property
     def model(self) -> str:
@@ -87,7 +123,9 @@ class ElevenLabsTTSSettings:
         return self.common.audio_format
 
 
-ProviderTTSSettings = MiniMaxTTSSettings | ElevenLabsTTSSettings
+ProviderTTSSettings = (
+    MiniMaxTTSSettings | MiniMaxAsyncTTSSettings | ElevenLabsTTSSettings
+)
 
 
 def serialize_common_settings(settings: ProviderTTSSettings) -> dict[str, object]:
@@ -100,6 +138,15 @@ def serialize_provider_settings(settings: ProviderTTSSettings) -> dict[str, obje
             "language_boost": settings.language_boost,
             "pitch": settings.pitch,
             "sample_rate": settings.sample_rate,
+        }
+    if isinstance(settings, MiniMaxAsyncTTSSettings):
+        return {
+            "language_boost": settings.language_boost,
+            "pitch": settings.pitch,
+            "sample_rate": settings.sample_rate,
+            "subtitles": settings.subtitles,
+            "poll_interval_seconds": settings.poll_interval_seconds,
+            "task_timeout_seconds": settings.task_timeout_seconds,
         }
     provider_settings: dict[str, object] = {
         "output_format": settings.output_format,
@@ -130,6 +177,7 @@ class TTSProvider(Protocol):
 
     name: str
     api_key_env_var: str
+    execution_mode: str
 
     def read_api_key(self) -> str:
         ...
@@ -141,6 +189,7 @@ class TTSProvider(Protocol):
         settings: ProviderTTSSettings,
         api_key: str,
         timeout_seconds: int,
+        max_retries: int = 1,
         context: SegmentSynthesisContext | None = None,
     ) -> SynthesisResult:
         ...

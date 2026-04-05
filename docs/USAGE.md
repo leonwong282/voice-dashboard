@@ -13,7 +13,8 @@ This document explains how to use `ttsrun` in this repository for daily batch TT
   - Text file path (positional argument)
   - `--stdin` (standard input)
   - `--clipboard` (supported clipboard commands such as `pbpaste`, `wl-paste`, `xclip`, or `xsel`)
-- Plain-text splitting by empty lines (one MP3 per segment)
+- Segment-based runs for `minimax`, `minimax-sync`, and `elevenlabs` (split on empty lines)
+- Whole-input async runs for `minimax-async`
 - Optional merge via `--merge` (default is **no merge**)
 - Output control for scripting:
   - `--quiet`
@@ -199,7 +200,9 @@ Each run generates at least:
 
 - `manifest.json`: job summary, parameters, per-segment results
 - `errors.jsonl`: only failed segments
-- Segment files (`0001.mp3`, etc.) when not merged, or `merged.mp3` when merge succeeds
+- Segment files (`0001.mp3`, etc.) when using segment-based providers and not merging
+- `merged.mp3` when merge succeeds on a segment-based provider
+- `output.mp3` when using `minimax-async`
 
 ## 6. Config File
 
@@ -266,6 +269,17 @@ Current schema:
       "language_boost": "Chinese,Yue",
       "sample_rate": 32000
     },
+    "minimax-async": {
+      "voice_id": "clone_voice_can",
+      "speed": 1.0,
+      "model": "speech-2.8-hd",
+      "pitch": 0,
+      "language_boost": "auto",
+      "sample_rate": 32000,
+      "subtitles": true,
+      "poll_interval_seconds": 2,
+      "task_timeout_seconds": 900
+    },
     "elevenlabs": {
       "voice_id": "JBFqnCBsd6RMkjVDRZzb",
       "speed": 1.0,
@@ -293,6 +307,7 @@ Meaning of each section:
 - `default_provider`: used when CLI does not pass `--provider`
 - `global`: only for settings that make sense regardless of provider
 - `providers.minimax`: MiniMax defaults, including shared-looking fields such as `voice_id`, `model`, and `speed`
+- `providers.minimax-async`: MiniMax async defaults for whole-input jobs, including polling and subtitle retention
 - `providers.elevenlabs`: ElevenLabs defaults, with its own `voice_id`, `model`, `speed`, and optional provider-native fields such as `output_format`, `timestamps`, `language_code`, `seed`, `enable_logging`, `continuity_mode`, and nested `voice_settings`
 
 Runtime precedence:
@@ -320,11 +335,12 @@ Do not put these in a shared section:
 
 Those are stored under each provider because they are provider-specific in practice.
 
-### 6.3 MiniMax and ElevenLabs in one config
+### 6.3 MiniMax sync, MiniMax async, and ElevenLabs in one config
 
-One config can now hold both providers cleanly:
+One config can now hold all currently supported provider paths cleanly:
 
 - MiniMax can keep its own `voice_id`, `model`, `speed`, `pitch`, `language_boost`, `sample_rate`
+- MiniMax async can keep its own `voice_id`, `model`, `speed`, `pitch`, `language_boost`, `sample_rate`, plus `subtitles`, `poll_interval_seconds`, and `task_timeout_seconds`
 - ElevenLabs can keep its own `voice_id`, `model`, `speed`, and provider-native request fields
 
 Example:
@@ -347,6 +363,17 @@ Example:
       "pitch": 0,
       "language_boost": "Chinese,Yue",
       "sample_rate": 32000
+    },
+    "minimax-async": {
+      "voice_id": "clone_voice_can",
+      "speed": 1.0,
+      "model": "speech-2.8-hd",
+      "pitch": 0,
+      "language_boost": "auto",
+      "sample_rate": 32000,
+      "subtitles": true,
+      "poll_interval_seconds": 2,
+      "task_timeout_seconds": 900
     },
     "elevenlabs": {
       "voice_id": "JBFqnCBsd6RMkjVDRZzb",
@@ -373,6 +400,7 @@ Example:
 With that config:
 
 - `ttsrun input.txt` uses MiniMax by default
+- `ttsrun --provider minimax-async input.txt` submits the whole normalized input as one async MiniMax task and writes `output.mp3` plus subtitle / extra attachments when returned
 - `ttsrun --provider elevenlabs input.txt` switches to the ElevenLabs section
 - `ttsrun --provider elevenlabs --voice-id custom123 input.txt` overrides only the current run
 
@@ -425,9 +453,11 @@ ttsrun examples/sample.txt --config /path/to/config.json
 - MiniMax provider names currently include:
   - `minimax` as the compatibility alias
   - `minimax-sync` for the current sync implementation
-  - `minimax-async` as the async routing placeholder for the next implementation phase
+  - `minimax-async` for whole-input async generation with subtitle-oriented outputs
 - `--provider minimax`, `--provider minimax-sync`, and `--provider minimax-async` all currently use `MINIMAX_API_KEY`.
-- `--provider minimax` and `--provider minimax-sync` support MiniMax-specific controls such as `--pitch`, `--language-boost`, and `--sample-rate`.
+- `--provider minimax`, `--provider minimax-sync`, and `--provider minimax-async` support MiniMax-specific controls such as `--pitch`, `--language-boost`, and `--sample-rate`.
+- `--provider minimax-async` writes one whole-input audio file (`output.mp3` by default) instead of `0001.mp3`, `0002.mp3`, ...
+- `--merge` is rejected when `--provider minimax-async` is active because async whole-input jobs already produce one primary audio file.
 - `--provider elevenlabs` supports the shared controls plus provider-local config fields under `providers.elevenlabs`.
 - ElevenLabs-native fields remain config-only in the current CLI. There are no `--el-*` flags in this release.
 - ElevenLabs timestamp metadata is available through `providers.elevenlabs.timestamps: true`.
@@ -465,6 +495,7 @@ ttsrun examples/sample.txt --config /path/to/config.json
   - `--quiet`
   - `--verbose`
   - `--json-summary`
+- `--merge` is only meaningful for segment-based providers (`minimax`, `minimax-sync`, `elevenlabs`).
 - Management commands:
   - `--version`
   - `doctor`

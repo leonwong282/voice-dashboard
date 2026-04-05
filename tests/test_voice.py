@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 import unittest
+import zipfile
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from subprocess import CompletedProcess
@@ -15,7 +16,11 @@ from voice_dashboard import __version__
 from voice_dashboard import cli, pipeline
 from voice_dashboard.config import load_config
 from voice_dashboard.errors import ExitCode
-from voice_dashboard.providers.base import ElevenLabsTTSSettings, MiniMaxTTSSettings
+from voice_dashboard.providers.base import (
+    ElevenLabsTTSSettings,
+    MiniMaxAsyncTTSSettings,
+    MiniMaxTTSSettings,
+)
 
 
 TEST_ENV_ROOT = Path(tempfile.mkdtemp(prefix="voice-dashboard-tests-"))
@@ -45,6 +50,14 @@ class MockResponse:
         if isinstance(self._payload, Exception):
             raise self._payload
         return self._payload
+
+
+def build_zip_bytes(files: dict[str, bytes]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for filename, content in files.items():
+            archive.writestr(filename, content)
+    return buffer.getvalue()
 
 
 class ParseSegmentsTests(unittest.TestCase):
@@ -86,6 +99,7 @@ class CLITests(unittest.TestCase):
         self.assertIn("global", payload)
         self.assertIn("providers", payload)
         self.assertIn("voice_id", payload["providers"]["minimax"])
+        self.assertIn("voice_id", payload["providers"]["minimax-async"])
         self.assertIn("output_root", payload["global"])
         self.assertIn("format", payload["global"])
         self.assertIn("voice_id", payload["providers"]["elevenlabs"])
@@ -106,6 +120,7 @@ class CLITests(unittest.TestCase):
         self.assertIn("global", payload)
         self.assertIn("providers", payload)
         self.assertIn("voice_id", payload["providers"]["minimax"])
+        self.assertIn("voice_id", payload["providers"]["minimax-async"])
         self.assertIn("output_format", payload["providers"]["elevenlabs"])
         self.assertIn("voice_settings", payload["providers"]["elevenlabs"])
 
@@ -890,6 +905,50 @@ class CLITests(unittest.TestCase):
             self.assertEqual(settings.voice_settings.style, 0.1)
             self.assertEqual(settings.voice_settings.use_speaker_boost, True)
 
+    def test_resolve_settings_returns_minimax_async_runtime_type(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_provider": "minimax-async",
+                        "providers": {
+                            "minimax-async": {
+                                "voice_id": "mm-async-voice",
+                                "model": "speech-2.8-hd",
+                                "speed": 1.05,
+                                "pitch": 1,
+                                "language_boost": "auto",
+                                "sample_rate": 32000,
+                                "subtitles": True,
+                                "poll_interval_seconds": 2,
+                                "task_timeout_seconds": 600,
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            config = load_config(str(config_path))
+            parser = cli.build_run_parser(show_commands=False)
+            args = parser.parse_args(
+                ["/tmp/input.txt", "--config", str(config_path)]
+            )
+
+            settings = cli.resolve_settings(args, config, "minimax-async")
+
+            self.assertIsInstance(settings, MiniMaxAsyncTTSSettings)
+            self.assertEqual(settings.voice_id, "mm-async-voice")
+            self.assertEqual(settings.model, "speech-2.8-hd")
+            self.assertEqual(settings.speed, 1.05)
+            self.assertEqual(settings.pitch, 1)
+            self.assertEqual(settings.language_boost, "auto")
+            self.assertEqual(settings.sample_rate, 32000)
+            self.assertEqual(settings.subtitles, True)
+            self.assertEqual(settings.poll_interval_seconds, 2)
+            self.assertEqual(settings.task_timeout_seconds, 600)
+
     def test_legacy_config_schema_is_rejected(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             config_path = Path(temp_dir) / "config.json"
@@ -1397,6 +1456,230 @@ class BatchFlowTests(unittest.TestCase):
                         exit_code = cli.main([str(input_path), "--output-dir", str(output_dir)])
             self.assertEqual(exit_code, ExitCode.OK)
             self.assertEqual(mock_post.call_count, 2)
+
+    def test_minimax_async_rejects_merge_flag(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            input_path.write_text("第一段", encoding="utf-8")
+            stderr_buffer = io.StringIO()
+
+            with redirect_stderr(stderr_buffer):
+                with self.assertRaises(SystemExit) as context:
+                    cli.main(
+                    [
+                        str(input_path),
+                        "--provider",
+                        "minimax-async",
+                        "--voice-id",
+                        "async-voice",
+                        "--model",
+                        "speech-2.8-hd",
+                        "--output-dir",
+                        str(output_dir),
+                        "--merge",
+                    ]
+                )
+
+            self.assertEqual(context.exception.code, ExitCode.USAGE)
+            self.assertIn("--merge cannot be used", stderr_buffer.getvalue())
+
+    def test_minimax_async_writes_whole_input_outputs_and_manifest(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            config_path = Path(temp_dir) / "config.json"
+            input_path.write_text("第一段\n\n第二段", encoding="utf-8")
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_provider": "minimax-async",
+                        "providers": {
+                            "minimax-async": {
+                                "voice_id": "async-voice",
+                                "model": "speech-2.8-hd",
+                                "speed": 1.0,
+                                "pitch": 1,
+                                "language_boost": "auto",
+                                "sample_rate": 32000,
+                                "subtitles": True,
+                                "poll_interval_seconds": 1,
+                                "task_timeout_seconds": 30,
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            bundle_bytes = build_zip_bytes(
+                {
+                    "audio/output.mp3": b"ASYNC-MP3",
+                    "audio/output.srt": "1\n00:00:00,000 --> 00:00:01,000\n第一段 第二段\n".encode(
+                        "utf-8"
+                    ),
+                    "audio/output.json": json.dumps(
+                        {"duration_seconds": 1.23}, ensure_ascii=False
+                    ).encode("utf-8"),
+                }
+            )
+            create_response = MockResponse(
+                200,
+                payload={
+                    "task_id": 123,
+                    "task_token": "token-123",
+                    "file_id": 456,
+                    "usage_characters": 6,
+                    "base_resp": {"status_code": 0, "status_msg": "success"},
+                },
+            )
+            query_response = MockResponse(
+                200,
+                payload={
+                    "task_id": 123,
+                    "status": "Success",
+                    "file_id": 456,
+                    "base_resp": {"status_code": 0, "status_msg": "success"},
+                },
+            )
+            retrieve_response = MockResponse(
+                200,
+                payload={
+                    "file": {
+                        "file_id": 456,
+                        "filename": "result_bundle.zip",
+                        "download_url": "https://example.com/result_bundle.zip",
+                    },
+                    "base_resp": {"status_code": 0, "status_msg": "success"},
+                },
+            )
+            download_response = MockResponse(200, content=bundle_bytes)
+
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
+                with patch(
+                    "voice_dashboard.providers.minimax_async.requests.post",
+                    return_value=create_response,
+                ) as mock_post:
+                    with patch(
+                        "voice_dashboard.providers.minimax_async.requests.get",
+                        side_effect=[query_response, retrieve_response, download_response],
+                    ) as mock_get:
+                        exit_code = cli.main(
+                            [
+                                str(input_path),
+                                "--config",
+                                str(config_path),
+                                "--output-dir",
+                                str(output_dir),
+                            ]
+                        )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual((output_dir / "output.mp3").read_bytes(), b"ASYNC-MP3")
+            self.assertTrue((output_dir / "output.srt").exists())
+            self.assertTrue((output_dir / "output.extra.json").exists())
+            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["settings"]["provider"], "minimax-async")
+            self.assertEqual(manifest["summary"]["task_id"], 123)
+            self.assertEqual(manifest["summary"]["file_id"], 456)
+            self.assertEqual(manifest["summary"]["remote_status"], "success")
+            self.assertEqual(manifest["summary"]["subtitle_file"], "output.srt")
+            self.assertEqual(manifest["summary"]["extra_file"], "output.extra.json")
+            self.assertEqual(manifest["segments"][0]["output_file"], "output.mp3")
+            self.assertEqual(manifest["segments"][0]["timestamp_status"], "skipped")
+            self.assertEqual(
+                mock_post.call_args.kwargs["json"]["audio_setting"]["audio_sample_rate"],
+                32000,
+            )
+            self.assertEqual(
+                mock_post.call_args.kwargs["json"]["audio_setting"]["format"],
+                "mp3",
+            )
+            self.assertEqual(mock_get.call_count, 3)
+
+    def test_minimax_async_missing_subtitle_fails_when_requested(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            config_path = Path(temp_dir) / "config.json"
+            input_path.write_text("第一段", encoding="utf-8")
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_provider": "minimax-async",
+                        "providers": {
+                            "minimax-async": {
+                                "voice_id": "async-voice",
+                                "subtitles": True,
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            bundle_bytes = build_zip_bytes(
+                {
+                    "audio/output.mp3": b"ASYNC-MP3",
+                    "audio/output.json": json.dumps({"duration_seconds": 1.23}).encode(
+                        "utf-8"
+                    ),
+                }
+            )
+            create_response = MockResponse(
+                200,
+                payload={
+                    "task_id": 123,
+                    "task_token": "token-123",
+                    "file_id": 456,
+                    "usage_characters": 3,
+                    "base_resp": {"status_code": 0, "status_msg": "success"},
+                },
+            )
+            query_response = MockResponse(
+                200,
+                payload={
+                    "task_id": 123,
+                    "status": "Success",
+                    "file_id": 456,
+                    "base_resp": {"status_code": 0, "status_msg": "success"},
+                },
+            )
+            retrieve_response = MockResponse(
+                200,
+                payload={
+                    "file": {"file_id": 456, "filename": "result_bundle.zip"},
+                    "base_resp": {"status_code": 0, "status_msg": "success"},
+                },
+            )
+            download_response = MockResponse(200, content=bundle_bytes)
+
+            with patch.dict(os.environ, build_test_env(MINIMAX_API_KEY="test-key"), clear=True):
+                with patch(
+                    "voice_dashboard.providers.minimax_async.requests.post",
+                    return_value=create_response,
+                ):
+                    with patch(
+                        "voice_dashboard.providers.minimax_async.requests.get",
+                        side_effect=[query_response, retrieve_response, download_response],
+                    ):
+                        exit_code = cli.main(
+                            [
+                                str(input_path),
+                                "--config",
+                                str(config_path),
+                                "--output-dir",
+                                str(output_dir),
+                            ]
+                        )
+
+            self.assertEqual(exit_code, ExitCode.API)
+            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["settings"]["provider"], "minimax-async")
+            self.assertEqual(manifest["summary"]["failed"], 1)
+            self.assertIn("subtitle file", manifest["segments"][0]["error"])
+            errors_lines = (output_dir / "errors.jsonl").read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(errors_lines), 1)
 
     def test_config_provider_is_used_when_cli_provider_is_absent(self):
         with tempfile.TemporaryDirectory() as temp_dir:
