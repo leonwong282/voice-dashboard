@@ -136,7 +136,8 @@ ttsrun --provider elevenlabs /tmp/tts-sample.txt
   - `manifest.json.settings.provider` is `elevenlabs`
   - `manifest.json.settings.common_settings.voice_id` matches `providers.elevenlabs.voice_id`
   - `manifest.json.settings.common_settings.model` matches `providers.elevenlabs.model`
-  - `manifest.json.settings.provider_settings` is empty for the current basic ElevenLabs path
+  - `manifest.json.settings.provider_settings.output_format` matches `providers.elevenlabs.output_format`
+  - `manifest.json.settings.provider_settings` does not include MiniMax-only fields
 
 ## 6. CLI Override Checks
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Protocol
 
 
@@ -37,8 +37,24 @@ class MiniMaxTTSSettings:
 
 
 @dataclass(frozen=True)
+class ElevenLabsVoiceSettings:
+    speed: float | None = None
+    stability: float | None = None
+    similarity_boost: float | None = None
+    style: float | None = None
+    use_speaker_boost: bool | None = None
+
+
+@dataclass(frozen=True)
 class ElevenLabsTTSSettings:
     common: CommonTTSSettings
+    output_format: str
+    language_code: str | None = None
+    seed: int | None = None
+    enable_logging: bool | None = None
+    voice_settings: ElevenLabsVoiceSettings = field(
+        default_factory=ElevenLabsVoiceSettings
+    )
 
     @property
     def model(self) -> str:
@@ -71,7 +87,24 @@ def serialize_provider_settings(settings: ProviderTTSSettings) -> dict[str, obje
             "pitch": settings.pitch,
             "sample_rate": settings.sample_rate,
         }
-    return {}
+    provider_settings: dict[str, object] = {
+        "output_format": settings.output_format,
+    }
+    if settings.language_code is not None:
+        provider_settings["language_code"] = settings.language_code
+    if settings.seed is not None:
+        provider_settings["seed"] = settings.seed
+    if settings.enable_logging is not None:
+        provider_settings["enable_logging"] = settings.enable_logging
+
+    voice_settings = {
+        key: value
+        for key, value in asdict(settings.voice_settings).items()
+        if value is not None
+    }
+    if voice_settings:
+        provider_settings["voice_settings"] = voice_settings
+    return provider_settings
 
 
 class TTSProvider(Protocol):

@@ -43,6 +43,7 @@ from voice_dashboard.pipeline import (
 )
 from voice_dashboard.providers.base import (
     CommonTTSSettings,
+    ElevenLabsVoiceSettings,
     ElevenLabsTTSSettings,
     MiniMaxTTSSettings,
     ProviderTTSSettings,
@@ -344,7 +345,20 @@ def resolve_settings(
         )
 
     if provider_name == "elevenlabs":
-        return ElevenLabsTTSSettings(common=common)
+        return ElevenLabsTTSSettings(
+            common=common,
+            output_format=config.elevenlabs.output_format,
+            language_code=config.elevenlabs.language_code,
+            seed=config.elevenlabs.seed,
+            enable_logging=config.elevenlabs.enable_logging,
+            voice_settings=ElevenLabsVoiceSettings(
+                speed=config.elevenlabs.voice_settings.speed,
+                stability=config.elevenlabs.voice_settings.stability,
+                similarity_boost=config.elevenlabs.voice_settings.similarity_boost,
+                style=config.elevenlabs.voice_settings.style,
+                use_speaker_boost=config.elevenlabs.voice_settings.use_speaker_boost,
+            ),
+        )
 
     raise ConfigError(f"Unsupported provider: {provider_name}")
 

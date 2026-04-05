@@ -1237,6 +1237,16 @@ class BatchFlowTests(unittest.TestCase):
                             "elevenlabs": {
                                 "voice_id": "voice-123",
                                 "model": "eleven-model",
+                                "output_format": "mp3_44100_128",
+                                "language_code": "zh",
+                                "seed": 12345,
+                                "enable_logging": True,
+                                "voice_settings": {
+                                    "stability": 0.5,
+                                    "similarity_boost": 0.8,
+                                    "style": 0.1,
+                                    "use_speaker_boost": True,
+                                },
                             }
                         },
                     },
@@ -1275,12 +1285,96 @@ class BatchFlowTests(unittest.TestCase):
                 "mp3_44100_128",
             )
             self.assertEqual(
+                mock_post.call_args.kwargs["params"]["enable_logging"],
+                "true",
+            )
+            self.assertEqual(
                 mock_post.call_args.kwargs["json"]["model_id"],
                 "eleven-model",
             )
             self.assertEqual(
+                mock_post.call_args.kwargs["json"]["language_code"],
+                "zh",
+            )
+            self.assertEqual(
+                mock_post.call_args.kwargs["json"]["seed"],
+                12345,
+            )
+            self.assertEqual(
                 mock_post.call_args.kwargs["json"]["voice_settings"]["speed"],
                 1.0,
+            )
+            self.assertEqual(
+                mock_post.call_args.kwargs["json"]["voice_settings"]["stability"],
+                0.5,
+            )
+            self.assertEqual(
+                mock_post.call_args.kwargs["json"]["voice_settings"][
+                    "similarity_boost"
+                ],
+                0.8,
+            )
+            self.assertEqual(
+                mock_post.call_args.kwargs["json"]["voice_settings"]["style"],
+                0.1,
+            )
+            self.assertEqual(
+                mock_post.call_args.kwargs["json"]["voice_settings"][
+                    "use_speaker_boost"
+                ],
+                True,
+            )
+
+    def test_elevenlabs_nested_voice_settings_speed_overrides_common_speed(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            config_path = Path(temp_dir) / "config.json"
+            input_path.write_text("第一段", encoding="utf-8")
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_provider": "elevenlabs",
+                        "providers": {
+                            "elevenlabs": {
+                                "voice_id": "voice-123",
+                                "speed": 1.0,
+                                "model": "eleven-model",
+                                "voice_settings": {
+                                    "speed": 0.95,
+                                },
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            response = MockResponse(200, content=b"ELVN")
+
+            with patch.dict(
+                os.environ,
+                build_test_env(ELEVENLABS_API_KEY="test-key"),
+                clear=True,
+            ):
+                with patch(
+                    "voice_dashboard.providers.elevenlabs.requests.post",
+                    return_value=response,
+                ) as mock_post:
+                    exit_code = cli.main(
+                        [
+                            str(input_path),
+                            "--config",
+                            str(config_path),
+                            "--output-dir",
+                            str(output_dir),
+                        ]
+                    )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual(
+                mock_post.call_args.kwargs["json"]["voice_settings"]["speed"],
+                0.95,
             )
 
     def test_cli_provider_overrides_config_provider(self):
@@ -1383,7 +1477,10 @@ class BatchFlowTests(unittest.TestCase):
             self.assertEqual(
                 manifest["settings"]["common_settings"]["voice_id"], "voice-123"
             )
-            self.assertEqual(manifest["settings"]["provider_settings"], {})
+            self.assertEqual(
+                manifest["settings"]["provider_settings"],
+                {"output_format": "mp3_44100_128"},
+            )
 
     def test_elevenlabs_verbose_settings_do_not_include_minimax_only_fields(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1420,7 +1517,10 @@ class BatchFlowTests(unittest.TestCase):
 
             self.assertEqual(exit_code, ExitCode.OK)
             self.assertIn("Common settings:", stderr_buffer.getvalue())
-            self.assertIn("Provider settings: {}", stderr_buffer.getvalue())
+            self.assertIn(
+                "Provider settings: {\"output_format\": \"mp3_44100_128\"}",
+                stderr_buffer.getvalue(),
+            )
             self.assertNotIn("language_boost", stderr_buffer.getvalue())
             self.assertNotIn("pitch", stderr_buffer.getvalue())
             self.assertNotIn("sample_rate", stderr_buffer.getvalue())

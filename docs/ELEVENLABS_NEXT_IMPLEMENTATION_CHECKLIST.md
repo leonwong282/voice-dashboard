@@ -117,21 +117,21 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Add adapter support for:
+- [x] Add adapter support for:
   - `output_format`
   - `language_code`
   - `seed`
   - `enable_logging`
-- [ ] Add nested `voice_settings` request mapping.
-- [ ] Only send provider-native fields that are actually configured.
-- [ ] Keep unsupported fields out of the request body.
-- [ ] Preserve current auth and retry behavior.
+- [x] Add nested `voice_settings` request mapping.
+- [x] Only send provider-native fields that are actually configured.
+- [x] Keep unsupported fields out of the request body.
+- [x] Preserve current auth and retry behavior.
 
 Acceptance:
 
-- [ ] ElevenLabs request payload matches the documented fields actually in use.
-- [ ] Existing MiniMax synthesis behavior is unchanged.
-- [ ] Expanded ElevenLabs fields work from config without regressing the basic path.
+- [x] ElevenLabs request payload matches the documented fields actually in use.
+- [x] Existing MiniMax synthesis behavior is unchanged.
+- [x] Expanded ElevenLabs fields work from config without regressing the basic path.
 
 ## 7. Phase 5: Decide Minimal CLI Exposure
 
@@ -214,11 +214,11 @@ Acceptance:
 ### Tasks
 
 - [ ] Add tests for provider-specific runtime settings types.
-- [ ] Add tests for provider-specific manifest output.
-- [ ] Add tests for ElevenLabs nested `voice_settings`.
-- [ ] Add tests for ElevenLabs `output_format`, `language_code`, and `seed`.
+- [x] Add tests for provider-specific manifest output.
+- [x] Add tests for ElevenLabs nested `voice_settings`.
+- [x] Add tests for ElevenLabs `output_format`, `language_code`, and `seed`.
 - [ ] Add tests for continuity request shaping if continuity is implemented.
-- [ ] Extend the manual checklist with new ElevenLabs-specific verification steps.
+- [x] Extend the manual checklist with new ElevenLabs-specific verification steps.
 
 Acceptance:
 

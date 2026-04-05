@@ -387,13 +387,15 @@ export ELEVENLABS_API_KEY="your_elevenlabs_key"
 
 ### 6.5 ElevenLabs config surface note
 
-`providers.elevenlabs` now accepts provider-native fields such as `output_format`, `language_code`, `seed`, `enable_logging`, and nested `voice_settings`.
+`providers.elevenlabs` supports provider-native request fields such as `output_format`, `language_code`, `seed`, `enable_logging`, and nested `voice_settings`.
 
 Current runtime note:
 
-- the basic ElevenLabs synthesis path still centers on `voice_id`, `model`, and `speed`
-- the additional provider-native config fields are schema-supported now so the config model no longer has to pretend all providers look the same
-- request mapping for those extra fields is expanded incrementally in later implementation phases
+- `output_format` is sent as an ElevenLabs query parameter
+- `enable_logging` is sent as an ElevenLabs query parameter when configured
+- `language_code` and `seed` are sent in the ElevenLabs request body when configured
+- nested `voice_settings` fields are sent only when configured
+- `voice_settings.speed` overrides the provider-level ElevenLabs `speed` for the request when both are present
 
 ### 6.6 Using a custom config path
 
@@ -407,7 +409,7 @@ ttsrun examples/sample.txt --config /path/to/config.json
 
 - `ttsrun` is TTS-only. It expects an existing `voice_id`.
 - `--provider minimax` supports MiniMax-specific controls such as `--pitch`, `--language-boost`, and `--sample-rate`.
-- `--provider elevenlabs` currently supports the shared controls only and uses a fixed MP3 output profile for the MVP.
+- `--provider elevenlabs` supports the shared controls plus provider-local config fields under `providers.elevenlabs`.
 - MiniMax-only flags are rejected when `--provider elevenlabs` is active.
 
 ## 7. Option Quick Reference

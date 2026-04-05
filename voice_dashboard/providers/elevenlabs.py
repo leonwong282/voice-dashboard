@@ -7,14 +7,12 @@ import requests
 from voice_dashboard.defaults import (
     DEFAULT_MODEL,
     ELEVENLABS_DEFAULT_MODEL,
-    ELEVENLABS_DEFAULT_OUTPUT_FORMAT,
 )
 from voice_dashboard.errors import ApiError, AuthenticationError, RetryableApiError
 from voice_dashboard.providers.base import ElevenLabsTTSSettings
 
 
 ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech"
-ELEVENLABS_OUTPUT_FORMAT = ELEVENLABS_DEFAULT_OUTPUT_FORMAT
 
 
 def extract_api_error_message(response: requests.Response) -> str:
@@ -51,6 +49,28 @@ def extract_api_error_message(response: requests.Response) -> str:
     return "Unknown API error"
 
 
+def build_voice_settings_payload(
+    settings: ElevenLabsTTSSettings,
+) -> dict[str, object]:
+    voice_settings: dict[str, object] = {}
+
+    speed = settings.voice_settings.speed
+    if speed is None:
+        speed = settings.speed
+    voice_settings["speed"] = speed
+
+    if settings.voice_settings.stability is not None:
+        voice_settings["stability"] = settings.voice_settings.stability
+    if settings.voice_settings.similarity_boost is not None:
+        voice_settings["similarity_boost"] = settings.voice_settings.similarity_boost
+    if settings.voice_settings.style is not None:
+        voice_settings["style"] = settings.voice_settings.style
+    if settings.voice_settings.use_speaker_boost is not None:
+        voice_settings["use_speaker_boost"] = settings.voice_settings.use_speaker_boost
+
+    return voice_settings
+
+
 class ElevenLabsProvider:
     name = "elevenlabs"
     api_key_env_var = "ELEVENLABS_API_KEY"
@@ -78,10 +98,17 @@ class ElevenLabsProvider:
         payload = {
             "text": text,
             "model_id": model_id,
-            "voice_settings": {
-                "speed": settings.speed,
-            },
+            "voice_settings": build_voice_settings_payload(settings),
         }
+        if settings.language_code is not None:
+            payload["language_code"] = settings.language_code
+        if settings.seed is not None:
+            payload["seed"] = settings.seed
+
+        params: dict[str, object] = {"output_format": settings.output_format}
+        if settings.enable_logging is not None:
+            params["enable_logging"] = str(settings.enable_logging).lower()
+
         headers = {
             "xi-api-key": api_key,
             "Content-Type": "application/json",
@@ -92,7 +119,7 @@ class ElevenLabsProvider:
             response = requests.post(
                 f"{ELEVENLABS_API_URL}/{settings.voice_id}",
                 headers=headers,
-                params={"output_format": ELEVENLABS_OUTPUT_FORMAT},
+                params=params,
                 json=payload,
                 timeout=timeout_seconds,
             )
