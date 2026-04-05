@@ -857,6 +857,12 @@ class BatchFlowTests(unittest.TestCase):
                 self.assertTrue((output_dir / "0002.mp3").exists())
                 self.assertFalse((output_dir / "merged.mp3").exists())
                 self.assertEqual(manifest["settings"]["provider"], "minimax")
+                self.assertEqual(
+                    manifest["settings"]["common_settings"]["audio_format"], "mp3"
+                )
+                self.assertEqual(
+                    manifest["settings"]["provider_settings"]["pitch"], 0
+                )
                 self.assertEqual(manifest["summary"]["merge_status"], "skipped")
                 self.assertEqual(manifest["summary"]["cleanup_status"], "skipped")
                 mock_subprocess_run.assert_not_called()
@@ -1292,9 +1298,10 @@ class BatchFlowTests(unittest.TestCase):
                 mock_post.call_args.kwargs["json"]["model_id"],
                 "eleven_multilingual_v2",
             )
-            self.assertNotIn("language_boost", manifest["settings"])
-            self.assertNotIn("pitch", manifest["settings"])
-            self.assertNotIn("sample_rate", manifest["settings"])
+            self.assertEqual(
+                manifest["settings"]["common_settings"]["voice_id"], "voice-123"
+            )
+            self.assertEqual(manifest["settings"]["provider_settings"], {})
 
     def test_elevenlabs_verbose_settings_do_not_include_minimax_only_fields(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1330,7 +1337,8 @@ class BatchFlowTests(unittest.TestCase):
                         )
 
             self.assertEqual(exit_code, ExitCode.OK)
-            self.assertIn("Settings:", stderr_buffer.getvalue())
+            self.assertIn("Common settings:", stderr_buffer.getvalue())
+            self.assertIn("Provider settings: {}", stderr_buffer.getvalue())
             self.assertNotIn("language_boost", stderr_buffer.getvalue())
             self.assertNotIn("pitch", stderr_buffer.getvalue())
             self.assertNotIn("sample_rate", stderr_buffer.getvalue())
@@ -1538,7 +1546,8 @@ class BatchFlowTests(unittest.TestCase):
                         )
 
             self.assertEqual(exit_code, ExitCode.OK)
-            self.assertIn("Settings:", stderr_buffer.getvalue())
+            self.assertIn("Common settings:", stderr_buffer.getvalue())
+            self.assertIn("Provider settings:", stderr_buffer.getvalue())
 
 
 if __name__ == "__main__":

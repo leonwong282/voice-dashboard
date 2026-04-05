@@ -62,20 +62,20 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Replace `manifest.settings = {"provider": ..., **asdict(settings)}` with structured output.
-- [ ] Recommended structure:
+- [x] Replace `manifest.settings = {"provider": ..., **asdict(settings)}` with structured output.
+- [x] Recommended structure:
   - `provider`
   - `common_settings`
   - `provider_settings`
-- [ ] Update verbose output to print only the active provider's settings.
-- [ ] Ensure ElevenLabs logs and manifest do not display MiniMax-only fields.
-- [ ] Keep output additive and stable where possible.
+- [x] Update verbose output to print only the active provider's settings.
+- [x] Ensure ElevenLabs logs and manifest do not display MiniMax-only fields.
+- [x] Keep output additive and stable where possible.
 
 Acceptance:
 
-- [ ] ElevenLabs manifest output contains only ElevenLabs-relevant provider settings.
-- [ ] ElevenLabs verbose output no longer includes MiniMax-only fields.
-- [ ] No secrets leak into output artifacts.
+- [x] ElevenLabs manifest output contains only ElevenLabs-relevant provider settings.
+- [x] ElevenLabs verbose output no longer includes MiniMax-only fields.
+- [x] No secrets leak into output artifacts.
 
 ## 5. Phase 3: Promote ElevenLabs Config To A Real Provider Surface
 

@@ -60,19 +60,18 @@ class ElevenLabsTTSSettings:
 ProviderTTSSettings = MiniMaxTTSSettings | ElevenLabsTTSSettings
 
 
-def serialize_runtime_settings(settings: ProviderTTSSettings) -> dict[str, object]:
-    payload = asdict(settings.common)
+def serialize_common_settings(settings: ProviderTTSSettings) -> dict[str, object]:
+    return asdict(settings.common)
 
+
+def serialize_provider_settings(settings: ProviderTTSSettings) -> dict[str, object]:
     if isinstance(settings, MiniMaxTTSSettings):
-        payload.update(
-            {
-                "language_boost": settings.language_boost,
-                "pitch": settings.pitch,
-                "sample_rate": settings.sample_rate,
-            }
-        )
-
-    return payload
+        return {
+            "language_boost": settings.language_boost,
+            "pitch": settings.pitch,
+            "sample_rate": settings.sample_rate,
+        }
+    return {}
 
 
 class TTSProvider(Protocol):

@@ -107,8 +107,9 @@ ttsrun /tmp/tts-sample.txt
   - `0001.mp3` and `0002.mp3` exist
   - `manifest.json` exists
   - `manifest.json.settings.provider` is `minimax`
-  - `manifest.json.settings.voice_id` matches `providers.minimax.voice_id`
-  - `manifest.json.settings.model` matches `providers.minimax.model`
+  - `manifest.json.settings.common_settings.voice_id` matches `providers.minimax.voice_id`
+  - `manifest.json.settings.common_settings.model` matches `providers.minimax.model`
+  - `manifest.json.settings.provider_settings.pitch` matches `providers.minimax.pitch`
 
 ## 5. ElevenLabs Provider Switch
 
@@ -121,8 +122,9 @@ ttsrun --provider elevenlabs /tmp/tts-sample.txt
 - Expect:
   - command succeeds
   - `manifest.json.settings.provider` is `elevenlabs`
-  - `manifest.json.settings.voice_id` matches `providers.elevenlabs.voice_id`
-  - `manifest.json.settings.model` matches `providers.elevenlabs.model`
+  - `manifest.json.settings.common_settings.voice_id` matches `providers.elevenlabs.voice_id`
+  - `manifest.json.settings.common_settings.model` matches `providers.elevenlabs.model`
+  - `manifest.json.settings.provider_settings` is empty for the current basic ElevenLabs path
 
 ## 6. CLI Override Checks
 
@@ -135,7 +137,7 @@ ttsrun --provider elevenlabs --voice-id override_voice --model eleven_multilingu
 - Expect:
   - command succeeds
   - `manifest.json.settings.provider` is `elevenlabs`
-  - `manifest.json.settings.voice_id` is `override_voice`
+  - `manifest.json.settings.common_settings.voice_id` is `override_voice`
   - config is not mutated
 
 ## 7. MiniMax-Specific Flags
@@ -148,9 +150,9 @@ ttsrun --provider minimax --pitch 1 --language-boost Chinese,Yue --sample-rate 3
 
 - Expect:
   - command succeeds
-  - `manifest.json.settings.pitch` is `1`
-  - `manifest.json.settings.language_boost` is `Chinese,Yue`
-  - `manifest.json.settings.sample_rate` is `32000`
+  - `manifest.json.settings.provider_settings.pitch` is `1`
+  - `manifest.json.settings.provider_settings.language_boost` is `Chinese,Yue`
+  - `manifest.json.settings.provider_settings.sample_rate` is `32000`
 
 ## 8. ElevenLabs Flag Rejection
 

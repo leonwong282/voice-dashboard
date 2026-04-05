@@ -24,7 +24,8 @@ from voice_dashboard.input_sources import InputSource
 from voice_dashboard.providers import DEFAULT_PROVIDER_NAME, get_provider
 from voice_dashboard.providers.base import (
     ProviderTTSSettings,
-    serialize_runtime_settings,
+    serialize_common_settings,
+    serialize_provider_settings,
 )
 from voice_dashboard.providers.minimax import requests as provider_requests
 
@@ -391,11 +392,15 @@ def run_batch_job(
     output_dir.mkdir(parents=True, exist_ok=True)
     reporter.info(f"Loaded {len(segments)} segments from {source.kind}")
     reporter.info(f"Output directory: {output_dir.resolve()}")
+    common_settings = serialize_common_settings(settings)
+    provider_settings = serialize_provider_settings(settings)
     reporter.detail(
-        "Settings: "
-        + json.dumps(
-            serialize_runtime_settings(settings), ensure_ascii=False, sort_keys=True
-        )
+        "Common settings: "
+        + json.dumps(common_settings, ensure_ascii=False, sort_keys=True)
+    )
+    reporter.detail(
+        "Provider settings: "
+        + json.dumps(provider_settings, ensure_ascii=False, sort_keys=True)
     )
     reporter.detail(
         "Request settings: "
@@ -499,7 +504,8 @@ def run_batch_job(
         "created_at": datetime.now().astimezone().isoformat(),
         "settings": {
             "provider": provider_name,
-            **serialize_runtime_settings(settings),
+            "common_settings": common_settings,
+            "provider_settings": provider_settings,
         },
         "summary": {
             "total_segments": len(segments),
