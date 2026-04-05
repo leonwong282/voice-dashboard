@@ -25,6 +25,7 @@ from voice_dashboard.errors import ConfigError
 from voice_dashboard.providers.registry import (
     DEFAULT_PROVIDER_NAME,
     SUPPORTED_PROVIDER_NAMES,
+    is_minimax_provider_name,
 )
 
 
@@ -105,7 +106,7 @@ class AppConfig:
         return self.global_options.open_after_finish
 
     def provider_config(self, provider_name: str) -> MiniMaxConfig | ElevenLabsConfig:
-        if provider_name == "minimax":
+        if is_minimax_provider_name(provider_name):
             return self.minimax
         if provider_name == "elevenlabs":
             return self.elevenlabs
@@ -298,10 +299,11 @@ def load_config(config_path: str | None) -> AppConfig:
     global_values = _expect_object(global_values, "global")
     providers_values = _expect_object(providers_values, "providers")
 
-    unknown_provider_keys = set(providers_values) - set(SUPPORTED_PROVIDER_NAMES)
+    supported_provider_sections = {"minimax", "elevenlabs"}
+    unknown_provider_keys = set(providers_values) - supported_provider_sections
     if unknown_provider_keys:
         unknown = ", ".join(sorted(unknown_provider_keys))
-        supported = ", ".join(SUPPORTED_PROVIDER_NAMES)
+        supported = ", ".join(sorted(supported_provider_sections))
         raise ConfigError(
             f"Unsupported provider section(s): {unknown}. Supported: {supported}."
         )

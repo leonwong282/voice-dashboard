@@ -51,6 +51,9 @@ from voice_dashboard.providers.base import (
 from voice_dashboard.providers.registry import (
     DEFAULT_PROVIDER_NAME,
     SUPPORTED_PROVIDER_NAMES,
+    get_provider as get_registered_provider,
+    get_supported_api_key_env_vars,
+    is_minimax_provider_name,
 )
 
 
@@ -332,7 +335,7 @@ def resolve_settings(
         audio_format=args.format or config.audio_format,
     )
 
-    if provider_name == "minimax":
+    if is_minimax_provider_name(provider_name):
         return MiniMaxTTSSettings(
             common=common,
             language_boost=args.language_boost or config.minimax.language_boost,
@@ -458,16 +461,7 @@ def run_doctor(config_path: str | None, provider_override: str | None = None) ->
 
     print_doctor_check("ok", "provider", resolved_provider)
 
-    api_key_label = (
-        "MINIMAX_API_KEY"
-        if resolved_provider == "minimax"
-        else "ELEVENLABS_API_KEY"
-    )
-    inactive_api_key_label = (
-        "ELEVENLABS_API_KEY"
-        if resolved_provider == "minimax"
-        else "MINIMAX_API_KEY"
-    )
+    api_key_label = get_registered_provider(resolved_provider).api_key_env_var
     api_key = os.getenv(api_key_label, "").strip()
     if api_key:
         print_doctor_check("ok", api_key_label, f"set ({len(api_key)} chars)")
@@ -480,19 +474,22 @@ def run_doctor(config_path: str | None, provider_override: str | None = None) ->
         if exit_code == ExitCode.OK:
             exit_code = ExitCode.AUTH
 
-    inactive_api_key = os.getenv(inactive_api_key_label, "").strip()
-    if inactive_api_key:
-        print_doctor_check(
-            "info",
-            inactive_api_key_label,
-            f"set ({len(inactive_api_key)} chars, inactive provider)",
-        )
-    else:
-        print_doctor_check(
-            "info",
-            inactive_api_key_label,
-            "not set (inactive provider)",
-        )
+    for inactive_api_key_label in get_supported_api_key_env_vars():
+        if inactive_api_key_label == api_key_label:
+            continue
+        inactive_api_key = os.getenv(inactive_api_key_label, "").strip()
+        if inactive_api_key:
+            print_doctor_check(
+                "info",
+                inactive_api_key_label,
+                f"set ({len(inactive_api_key)} chars, inactive provider)",
+            )
+        else:
+            print_doctor_check(
+                "info",
+                inactive_api_key_label,
+                "not set (inactive provider)",
+            )
 
     ffmpeg_path = find_ffmpeg_path()
     if ffmpeg_path:

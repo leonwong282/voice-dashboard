@@ -277,6 +277,17 @@ class CLITests(unittest.TestCase):
         self.assertIn("elevenlabs", buffer.getvalue())
         self.assertIn("ELEVENLABS_API_KEY", buffer.getvalue())
 
+    def test_doctor_subcommand_honors_minimax_async_provider_override(self):
+        buffer = io.StringIO()
+        with patch.dict(os.environ, build_test_env(), clear=True):
+            with redirect_stdout(buffer):
+                exit_code = cli.main(["doctor", "--provider", "minimax-async"])
+
+        self.assertEqual(exit_code, ExitCode.AUTH)
+        self.assertIn("provider", buffer.getvalue())
+        self.assertIn("minimax-async", buffer.getvalue())
+        self.assertIn("MINIMAX_API_KEY", buffer.getvalue())
+
     def test_doctor_reports_inactive_provider_key_as_info(self):
         buffer = io.StringIO()
         with patch.dict(
@@ -787,6 +798,41 @@ class CLITests(unittest.TestCase):
             self.assertEqual(settings.pitch, 1)
             self.assertEqual(settings.language_boost, "Chinese,Yue")
             self.assertEqual(settings.sample_rate, 32000)
+
+    def test_resolve_settings_returns_minimax_runtime_type_for_sync_provider_name(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_provider": "minimax-sync",
+                        "providers": {
+                            "minimax": {
+                                "voice_id": "mm-sync-voice",
+                                "model": "speech-2.8-hd",
+                                "speed": 1.05,
+                                "pitch": -1,
+                                "language_boost": "Chinese,Yue",
+                                "sample_rate": 32000,
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            config = load_config(str(config_path))
+            parser = cli.build_run_parser(show_commands=False)
+            args = parser.parse_args(
+                ["/tmp/input.txt", "--config", str(config_path)]
+            )
+
+            settings = cli.resolve_settings(args, config, "minimax-sync")
+
+            self.assertIsInstance(settings, MiniMaxTTSSettings)
+            self.assertEqual(settings.voice_id, "mm-sync-voice")
+            self.assertEqual(settings.speed, 1.05)
+            self.assertEqual(settings.pitch, -1)
 
     def test_resolve_settings_returns_elevenlabs_runtime_type(self):
         with tempfile.TemporaryDirectory() as temp_dir:

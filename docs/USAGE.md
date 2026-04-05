@@ -422,7 +422,12 @@ ttsrun examples/sample.txt --config /path/to/config.json
 ### 6.7 Provider Notes
 
 - `ttsrun` is TTS-only. It expects an existing `voice_id`.
-- `--provider minimax` supports MiniMax-specific controls such as `--pitch`, `--language-boost`, and `--sample-rate`.
+- MiniMax provider names currently include:
+  - `minimax` as the compatibility alias
+  - `minimax-sync` for the current sync implementation
+  - `minimax-async` as the async routing placeholder for the next implementation phase
+- `--provider minimax`, `--provider minimax-sync`, and `--provider minimax-async` all currently use `MINIMAX_API_KEY`.
+- `--provider minimax` and `--provider minimax-sync` support MiniMax-specific controls such as `--pitch`, `--language-boost`, and `--sample-rate`.
 - `--provider elevenlabs` supports the shared controls plus provider-local config fields under `providers.elevenlabs`.
 - ElevenLabs-native fields remain config-only in the current CLI. There are no `--el-*` flags in this release.
 - ElevenLabs timestamp metadata is available through `providers.elevenlabs.timestamps: true`.
@@ -440,7 +445,7 @@ ttsrun examples/sample.txt --config /path/to/config.json
   - `--output-root <dir>`
   - `--name <job-name>`
 - Voice parameters:
-  - `--provider {minimax,elevenlabs}`
+  - `--provider {minimax,minimax-sync,minimax-async,elevenlabs}`
   - `--voice-id`
   - `--speed`
   - `--model`
