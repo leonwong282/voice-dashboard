@@ -24,6 +24,8 @@ from voice_dashboard.input_sources import InputSource
 from voice_dashboard.providers import DEFAULT_PROVIDER_NAME, get_provider
 from voice_dashboard.providers.base import (
     ProviderTTSSettings,
+    SegmentSynthesisContext,
+    SynthesisResult,
     serialize_common_settings,
     serialize_provider_settings,
 )
@@ -94,7 +96,8 @@ def synthesize_segment(
     request_settings: RequestSettings | None = None,
     reporter: ProgressReporter | None = None,
     provider_name: str = DEFAULT_PROVIDER_NAME,
-) -> bytes:
+    context: SegmentSynthesisContext | None = None,
+) -> SynthesisResult:
     request_settings = request_settings or RequestSettings()
     provider = get_provider(provider_name)
     last_error: RetryableApiError | None = None
@@ -105,6 +108,7 @@ def synthesize_segment(
                 settings=settings,
                 api_key=api_key,
                 timeout_seconds=request_settings.timeout_seconds,
+                context=context,
             )
         except RetryableApiError as exc:
             last_error = exc
@@ -126,6 +130,13 @@ def synthesize_segment(
 
 def write_audio_file(output_path: Path, audio_bytes: bytes) -> None:
     output_path.write_bytes(audio_bytes)
+
+
+def write_timestamp_file(output_path: Path, payload: dict[str, Any]) -> None:
+    output_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 
 def write_manifest(output_dir: Path, manifest: dict[str, Any]) -> None:
@@ -419,6 +430,8 @@ def run_batch_job(
         filename = f"{index:0{index_width}d}.{settings.audio_format}"
         output_path = output_dir / filename
         reporter.info(f"[{index}/{len(segments)}] Synthesizing {filename} ...")
+        previous_text = segments[index - 2] if index > 1 else None
+        next_text = segments[index] if index < len(segments) else None
 
         try:
             audio_bytes = synthesize_segment(
@@ -428,6 +441,10 @@ def run_batch_job(
                 request_settings=request_settings,
                 reporter=reporter,
                 provider_name=provider_name,
+                context=SegmentSynthesisContext(
+                    previous_text=previous_text,
+                    next_text=next_text,
+                ),
             )
         except TTSBatchError as exc:
             failure_count += 1
@@ -438,6 +455,8 @@ def run_batch_job(
                     "index": index,
                     "text": text,
                     "output_file": None,
+                    "timestamp_file": None,
+                    "timestamp_status": "skipped",
                     "status": "failed",
                     "error": str(exc),
                 }
@@ -445,14 +464,31 @@ def run_batch_job(
             reporter.error(f"[{index}/{len(segments)}] Failed: {exc}")
             continue
 
-        write_audio_file(output_path, audio_bytes)
+        write_audio_file(output_path, audio_bytes.audio_bytes)
         generated_audio_files.append(output_path)
         success_count += 1
+        timestamp_file: str | None = None
+        timestamp_status = "skipped"
+        if audio_bytes.timestamps is not None:
+            timestamp_file = f"{output_path.stem}.timestamps.json"
+            write_timestamp_file(
+                output_dir / timestamp_file,
+                {
+                    "provider": provider_name,
+                    "segment_index": index,
+                    "text": text,
+                    "audio_file": filename,
+                    **audio_bytes.timestamps,
+                },
+            )
+            timestamp_status = "success"
         results.append(
             {
                 "index": index,
                 "text": text,
                 "output_file": filename,
+                "timestamp_file": timestamp_file,
+                "timestamp_status": timestamp_status,
                 "status": "success",
                 "error": None,
             }

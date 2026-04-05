@@ -348,9 +348,11 @@ def resolve_settings(
         return ElevenLabsTTSSettings(
             common=common,
             output_format=config.elevenlabs.output_format,
+            timestamps=config.elevenlabs.timestamps,
             language_code=config.elevenlabs.language_code,
             seed=config.elevenlabs.seed,
             enable_logging=config.elevenlabs.enable_logging,
+            continuity_mode=config.elevenlabs.continuity_mode,
             voice_settings=ElevenLabsVoiceSettings(
                 speed=config.elevenlabs.voice_settings.speed,
                 stability=config.elevenlabs.voice_settings.stability,

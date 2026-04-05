@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Protocol
+from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
@@ -10,6 +10,18 @@ class CommonTTSSettings:
     voice_id: str
     speed: float
     audio_format: str
+
+
+@dataclass(frozen=True)
+class SegmentSynthesisContext:
+    previous_text: str | None = None
+    next_text: str | None = None
+
+
+@dataclass(frozen=True)
+class SynthesisResult:
+    audio_bytes: bytes
+    timestamps: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -49,9 +61,11 @@ class ElevenLabsVoiceSettings:
 class ElevenLabsTTSSettings:
     common: CommonTTSSettings
     output_format: str
+    timestamps: bool | None = None
     language_code: str | None = None
     seed: int | None = None
     enable_logging: bool | None = None
+    continuity_mode: str | None = None
     voice_settings: ElevenLabsVoiceSettings = field(
         default_factory=ElevenLabsVoiceSettings
     )
@@ -90,12 +104,16 @@ def serialize_provider_settings(settings: ProviderTTSSettings) -> dict[str, obje
     provider_settings: dict[str, object] = {
         "output_format": settings.output_format,
     }
+    if settings.timestamps is not None:
+        provider_settings["timestamps"] = settings.timestamps
     if settings.language_code is not None:
         provider_settings["language_code"] = settings.language_code
     if settings.seed is not None:
         provider_settings["seed"] = settings.seed
     if settings.enable_logging is not None:
         provider_settings["enable_logging"] = settings.enable_logging
+    if settings.continuity_mode is not None:
+        provider_settings["continuity_mode"] = settings.continuity_mode
 
     voice_settings = {
         key: value
@@ -123,5 +141,6 @@ class TTSProvider(Protocol):
         settings: ProviderTTSSettings,
         api_key: str,
         timeout_seconds: int,
-    ) -> bytes:
+        context: SegmentSynthesisContext | None = None,
+    ) -> SynthesisResult:
         ...

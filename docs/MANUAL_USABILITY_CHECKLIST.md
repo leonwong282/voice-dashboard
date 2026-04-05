@@ -50,9 +50,11 @@ Prepare a config file:
       "speed": 1.0,
       "model": "eleven_multilingual_v2",
       "output_format": "mp3_44100_128",
+      "timestamps": true,
       "language_code": "zh",
       "seed": 12345,
       "enable_logging": true,
+      "continuity_mode": "adjacent_text",
       "voice_settings": {
         "speed": 0.95,
         "stability": 0.5,
@@ -235,7 +237,49 @@ If `ffmpeg` is not installed:
 - expect a non-zero exit
 - expect segment files to remain for debugging
 
-## 12. Legacy Config Rejection
+## 12. ElevenLabs Continuity Check
+
+- Prepare a three-segment input:
+
+```bash
+cat > /tmp/tts-continuity.txt <<'EOF'
+第一段
+
+第二段
+
+第三段
+EOF
+```
+
+- Set `providers.elevenlabs.continuity_mode` to `"adjacent_text"`, then run:
+
+```bash
+ttsrun --provider elevenlabs /tmp/tts-continuity.txt --verbose
+```
+
+- Expect:
+  - command succeeds
+  - `manifest.json.settings.provider_settings.continuity_mode` is `adjacent_text`
+  - continuity remains provider-local and does not affect MiniMax runs
+  - adjacent-segment phrasing sounds more connected than the same run with `continuity_mode` removed
+
+## 13. ElevenLabs Timestamp Sidecars
+
+- Set `providers.elevenlabs.timestamps` to `true`, then run:
+
+```bash
+ttsrun --provider elevenlabs /tmp/tts-sample.txt
+```
+
+- Expect:
+  - command succeeds
+  - each successful segment has a matching sidecar such as `0001.timestamps.json`
+  - `manifest.json.settings.provider_settings.timestamps` is `true`
+  - each successful segment entry includes:
+    - `timestamp_file`
+    - `timestamp_status`
+
+## 14. Legacy Config Rejection
 
 Create an old-style config file:
 
@@ -261,10 +305,12 @@ Expect:
   - legacy config schema is not supported
   - use `default_provider`, `global`, and `providers`
 
-## 13. Final Sign-Off
+## 15. Final Sign-Off
 
 - MiniMax path works with config defaults
 - ElevenLabs path works with config defaults
+- ElevenLabs timestamp sidecars are written only when explicitly enabled
+- ElevenLabs continuity works only when explicitly enabled
 - CLI overrides beat config values
 - MiniMax-only flags are rejected for ElevenLabs
 - `doctor` shows the correct active/inactive API key behavior

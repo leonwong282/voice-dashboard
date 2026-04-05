@@ -13,7 +13,9 @@ import requests
 import voice
 from voice_dashboard import __version__
 from voice_dashboard import cli, pipeline
+from voice_dashboard.config import load_config
 from voice_dashboard.errors import ExitCode
+from voice_dashboard.providers.base import ElevenLabsTTSSettings, MiniMaxTTSSettings
 
 
 TEST_ENV_ROOT = Path(tempfile.mkdtemp(prefix="voice-dashboard-tests-"))
@@ -678,9 +680,11 @@ class CLITests(unittest.TestCase):
                                 "model": "eleven-model",
                                 "speed": 1.1,
                                 "output_format": "mp3_44100_128",
+                                "timestamps": True,
                                 "language_code": "zh",
                                 "seed": 12345,
                                 "enable_logging": True,
+                                "continuity_mode": "adjacent_text",
                                 "voice_settings": {
                                     "speed": 0.95,
                                     "stability": 0.5,
@@ -706,9 +710,11 @@ class CLITests(unittest.TestCase):
             payload = json.loads(buffer.getvalue())
             elevenlabs = payload["providers"]["elevenlabs"]
             self.assertEqual(elevenlabs["output_format"], "mp3_44100_128")
+            self.assertEqual(elevenlabs["timestamps"], True)
             self.assertEqual(elevenlabs["language_code"], "zh")
             self.assertEqual(elevenlabs["seed"], 12345)
             self.assertEqual(elevenlabs["enable_logging"], True)
+            self.assertEqual(elevenlabs["continuity_mode"], "adjacent_text")
             self.assertEqual(elevenlabs["voice_settings"]["speed"], 0.95)
             self.assertEqual(elevenlabs["voice_settings"]["stability"], 0.5)
             self.assertEqual(elevenlabs["voice_settings"]["similarity_boost"], 0.8)
@@ -743,6 +749,100 @@ class CLITests(unittest.TestCase):
             payload = json.loads(buffer.getvalue())
             self.assertEqual(payload["global"]["request_timeout_seconds"], 12)
             self.assertEqual(payload["global"]["max_retries"], 4)
+
+    def test_resolve_settings_returns_minimax_runtime_type(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_provider": "minimax",
+                        "providers": {
+                            "minimax": {
+                                "voice_id": "mm-voice",
+                                "model": "speech-2.8-hd",
+                                "speed": 1.2,
+                                "pitch": 1,
+                                "language_boost": "Chinese,Yue",
+                                "sample_rate": 32000,
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            config = load_config(str(config_path))
+            parser = cli.build_run_parser(show_commands=False)
+            args = parser.parse_args(
+                ["/tmp/input.txt", "--config", str(config_path)]
+            )
+
+            settings = cli.resolve_settings(args, config, "minimax")
+
+            self.assertIsInstance(settings, MiniMaxTTSSettings)
+            self.assertEqual(settings.voice_id, "mm-voice")
+            self.assertEqual(settings.model, "speech-2.8-hd")
+            self.assertEqual(settings.speed, 1.2)
+            self.assertEqual(settings.pitch, 1)
+            self.assertEqual(settings.language_boost, "Chinese,Yue")
+            self.assertEqual(settings.sample_rate, 32000)
+
+    def test_resolve_settings_returns_elevenlabs_runtime_type(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_provider": "elevenlabs",
+                        "providers": {
+                            "elevenlabs": {
+                                "voice_id": "el-voice",
+                                "model": "eleven-model",
+                                "speed": 1.1,
+                                "output_format": "mp3_44100_128",
+                                "timestamps": True,
+                                "language_code": "zh",
+                                "seed": 12345,
+                                "enable_logging": True,
+                                "continuity_mode": "adjacent_text",
+                                "voice_settings": {
+                                    "speed": 0.95,
+                                    "stability": 0.5,
+                                    "similarity_boost": 0.8,
+                                    "style": 0.1,
+                                    "use_speaker_boost": True,
+                                },
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            config = load_config(str(config_path))
+            parser = cli.build_run_parser(show_commands=False)
+            args = parser.parse_args(
+                ["/tmp/input.txt", "--config", str(config_path)]
+            )
+
+            settings = cli.resolve_settings(args, config, "elevenlabs")
+
+            self.assertIsInstance(settings, ElevenLabsTTSSettings)
+            self.assertEqual(settings.voice_id, "el-voice")
+            self.assertEqual(settings.model, "eleven-model")
+            self.assertEqual(settings.speed, 1.1)
+            self.assertEqual(settings.output_format, "mp3_44100_128")
+            self.assertEqual(settings.timestamps, True)
+            self.assertEqual(settings.language_code, "zh")
+            self.assertEqual(settings.seed, 12345)
+            self.assertEqual(settings.enable_logging, True)
+            self.assertEqual(settings.continuity_mode, "adjacent_text")
+            self.assertEqual(settings.voice_settings.speed, 0.95)
+            self.assertEqual(settings.voice_settings.stability, 0.5)
+            self.assertEqual(settings.voice_settings.similarity_boost, 0.8)
+            self.assertEqual(settings.voice_settings.style, 0.1)
+            self.assertEqual(settings.voice_settings.use_speaker_boost, True)
 
     def test_legacy_config_schema_is_rejected(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -791,6 +891,35 @@ class CLITests(unittest.TestCase):
             self.assertEqual(exit_code, ExitCode.CONFIG)
             self.assertIn(
                 "providers.elevenlabs.seed", stderr_buffer.getvalue()
+            )
+
+    def test_invalid_elevenlabs_continuity_mode_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            stderr_buffer = io.StringIO()
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "providers": {
+                            "elevenlabs": {
+                                "continuity_mode": "auto",
+                            }
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            with redirect_stderr(stderr_buffer):
+                exit_code = cli.main(
+                    ["config", "show", "--config", str(config_path)]
+                )
+
+            self.assertEqual(exit_code, ExitCode.CONFIG)
+            self.assertIn(
+                "providers.elevenlabs.continuity_mode",
+                stderr_buffer.getvalue(),
             )
 
     def test_config_show_reports_legacy_resolution_metadata(self):
@@ -1376,6 +1505,148 @@ class BatchFlowTests(unittest.TestCase):
                 mock_post.call_args.kwargs["json"]["voice_settings"]["speed"],
                 0.95,
             )
+
+    def test_elevenlabs_timestamp_mode_writes_sidecar_files(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            config_path = Path(temp_dir) / "config.json"
+            input_path.write_text("第一段", encoding="utf-8")
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_provider": "elevenlabs",
+                        "providers": {
+                            "elevenlabs": {
+                                "voice_id": "voice-123",
+                                "model": "eleven-model",
+                                "timestamps": True,
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            response = MockResponse(
+                200,
+                payload={
+                    "audio_base64": "RUxWTg==",
+                    "alignment": {
+                        "characters": ["第", "一", "段"],
+                        "character_start_times_seconds": [0.0, 0.1, 0.2],
+                        "character_end_times_seconds": [0.1, 0.2, 0.3],
+                    },
+                    "normalized_alignment": {
+                        "characters": ["第", "一", "段"],
+                        "character_start_times_seconds": [0.0, 0.1, 0.2],
+                        "character_end_times_seconds": [0.1, 0.2, 0.3],
+                    },
+                },
+                text='{"audio_base64":"RUxWTg=="}',
+            )
+
+            with patch.dict(
+                os.environ,
+                build_test_env(ELEVENLABS_API_KEY="test-key"),
+                clear=True,
+            ):
+                with patch(
+                    "voice_dashboard.providers.elevenlabs.requests.post",
+                    return_value=response,
+                ) as mock_post:
+                    exit_code = cli.main(
+                        [
+                            str(input_path),
+                            "--config",
+                            str(config_path),
+                            "--output-dir",
+                            str(output_dir),
+                        ]
+                    )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual(
+                mock_post.call_args.args[0],
+                "https://api.elevenlabs.io/v1/text-to-speech/voice-123/with-timestamps",
+            )
+            self.assertEqual(
+                mock_post.call_args.kwargs["headers"]["Accept"],
+                "application/json",
+            )
+            self.assertEqual((output_dir / "0001.mp3").read_bytes(), b"ELVN")
+            sidecar = json.loads(
+                (output_dir / "0001.timestamps.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(sidecar["provider"], "elevenlabs")
+            self.assertEqual(sidecar["segment_index"], 1)
+            self.assertEqual(sidecar["audio_file"], "0001.mp3")
+            self.assertEqual(sidecar["alignment"]["characters"], ["第", "一", "段"])
+            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["settings"]["provider_settings"]["timestamps"], True)
+            self.assertEqual(manifest["segments"][0]["timestamp_file"], "0001.timestamps.json")
+            self.assertEqual(manifest["segments"][0]["timestamp_status"], "success")
+
+    def test_elevenlabs_adjacent_text_continuity_shapes_neighbor_requests(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "input.txt"
+            output_dir = Path(temp_dir) / "out"
+            config_path = Path(temp_dir) / "config.json"
+            input_path.write_text("第一段\n\n第二段\n\n第三段", encoding="utf-8")
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "default_provider": "elevenlabs",
+                        "providers": {
+                            "elevenlabs": {
+                                "voice_id": "voice-123",
+                                "model": "eleven-model",
+                                "continuity_mode": "adjacent_text",
+                            }
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            response = MockResponse(200, content=b"ELVN")
+
+            with patch.dict(
+                os.environ,
+                build_test_env(ELEVENLABS_API_KEY="test-key"),
+                clear=True,
+            ):
+                with patch(
+                    "voice_dashboard.providers.elevenlabs.requests.post",
+                    return_value=response,
+                ) as mock_post:
+                    exit_code = cli.main(
+                        [
+                            str(input_path),
+                            "--config",
+                            str(config_path),
+                            "--output-dir",
+                            str(output_dir),
+                        ]
+                    )
+
+            self.assertEqual(exit_code, ExitCode.OK)
+            self.assertEqual(mock_post.call_count, 3)
+            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                manifest["settings"]["provider_settings"]["continuity_mode"],
+                "adjacent_text",
+            )
+            first_payload = mock_post.call_args_list[0].kwargs["json"]
+            second_payload = mock_post.call_args_list[1].kwargs["json"]
+            third_payload = mock_post.call_args_list[2].kwargs["json"]
+
+            self.assertNotIn("previous_text", first_payload)
+            self.assertEqual(first_payload["next_text"], "第二段")
+            self.assertEqual(second_payload["previous_text"], "第一段")
+            self.assertEqual(second_payload["next_text"], "第三段")
+            self.assertEqual(third_payload["previous_text"], "第二段")
+            self.assertNotIn("next_text", third_payload)
 
     def test_cli_provider_overrides_config_provider(self):
         with tempfile.TemporaryDirectory() as temp_dir:

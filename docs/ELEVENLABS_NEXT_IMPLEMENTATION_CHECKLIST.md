@@ -142,10 +142,11 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Keep the current common flags unchanged.
-- [ ] Keep MiniMax-only flags explicit and provider-bound.
-- [ ] Decide which ElevenLabs-native fields remain config-only for now.
-- [ ] If exposing new CLI flags, keep the first set minimal:
+- [x] Keep the current common flags unchanged.
+- [x] Keep MiniMax-only flags explicit and provider-bound.
+- [x] Decide which ElevenLabs-native fields remain config-only for now.
+- [x] Decision for this phase: do not add ElevenLabs-only CLI flags yet.
+- [x] If exposing new CLI flags in a later phase, keep the first set minimal:
   - `--el-output-format`
   - `--el-language-code`
   - `--el-seed`
@@ -153,12 +154,12 @@ Acceptance:
   - `--el-similarity-boost`
   - `--el-style`
   - `--el-use-speaker-boost`
-- [ ] Reject ElevenLabs-only flags when MiniMax is active, if any are added.
+- [x] Reject ElevenLabs-only flags when MiniMax is active, if any are added.
 
 Acceptance:
 
-- [ ] CLI remains understandable and does not become a union of every provider field.
-- [ ] Provider-specific flags remain clearly separated.
+- [x] CLI remains understandable and does not become a union of every provider field.
+- [x] Provider-specific flags remain clearly separated.
 
 ## 8. Phase 6: Continuity-Aware Batch Generation
 
@@ -172,18 +173,19 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Evaluate support for `previous_text` and `next_text`.
-- [ ] Decide whether continuity should be:
+- [x] Evaluate support for `previous_text` and `next_text`.
+- [x] Decide whether continuity should be:
   - config-only
   - CLI opt-in
   - automatic but explicitly documented
-- [ ] If added, keep the first mode opt-in and predictable.
-- [ ] Document when continuity helps and when it can over-constrain generation.
+- [x] Decision for this phase: keep continuity config-only under `providers.elevenlabs.continuity_mode`.
+- [x] If added, keep the first mode opt-in and predictable.
+- [x] Document when continuity helps and when it can over-constrain generation.
 
 Acceptance:
 
-- [ ] Continuity behavior is explicit and testable.
-- [ ] Manual A/B checks show whether adjacent-segment quality improves.
+- [x] Continuity behavior is explicit and testable.
+- [x] Manual A/B checks show whether adjacent-segment quality improves.
 
 ## 9. Phase 7: Timestamp And Streaming Decision
 
@@ -194,14 +196,15 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Decide whether the next priority is timestamps or streaming.
-- [ ] Document the decision and rationale.
-- [ ] If timestamps are chosen, define the target output shape before coding.
-- [ ] If streaming is chosen, define how it fits a file-oriented batch CLI before coding.
+- [x] Decide whether the next priority is timestamps or streaming.
+- [x] Document the decision and rationale.
+- [x] Decision for this phase: choose timestamps before streaming.
+- [x] If timestamps are chosen, define the target output shape before coding.
+- [x] Streaming is deferred until there is a concrete interactive playback workflow.
 
 Acceptance:
 
-- [ ] There is one explicit direction rather than both being partially implemented.
+- [x] There is one explicit direction rather than both being partially implemented.
 
 ## 10. Phase 8: Tests And Manual Verification
 
@@ -213,17 +216,17 @@ Acceptance:
 
 ### Tasks
 
-- [ ] Add tests for provider-specific runtime settings types.
+- [x] Add tests for provider-specific runtime settings types.
 - [x] Add tests for provider-specific manifest output.
 - [x] Add tests for ElevenLabs nested `voice_settings`.
 - [x] Add tests for ElevenLabs `output_format`, `language_code`, and `seed`.
-- [ ] Add tests for continuity request shaping if continuity is implemented.
+- [x] Add tests for continuity request shaping if continuity is implemented.
 - [x] Extend the manual checklist with new ElevenLabs-specific verification steps.
 
 Acceptance:
 
-- [ ] `pytest -q` passes locally.
-- [ ] Manual verification steps cover the expanded ElevenLabs path.
+- [x] `pytest -q` passes locally.
+- [x] Manual verification steps cover the expanded ElevenLabs path.
 
 ## 11. Suggested Execution Order
 

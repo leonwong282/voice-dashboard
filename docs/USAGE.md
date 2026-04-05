@@ -271,9 +271,11 @@ Current schema:
       "speed": 1.0,
       "model": "eleven_multilingual_v2",
       "output_format": "mp3_44100_128",
+      "timestamps": true,
       "language_code": "zh",
       "seed": 12345,
       "enable_logging": true,
+      "continuity_mode": "adjacent_text",
       "voice_settings": {
         "speed": 0.95,
         "stability": 0.5,
@@ -291,7 +293,7 @@ Meaning of each section:
 - `default_provider`: used when CLI does not pass `--provider`
 - `global`: only for settings that make sense regardless of provider
 - `providers.minimax`: MiniMax defaults, including shared-looking fields such as `voice_id`, `model`, and `speed`
-- `providers.elevenlabs`: ElevenLabs defaults, with its own `voice_id`, `model`, `speed`, and optional provider-native fields such as `output_format`, `language_code`, `seed`, `enable_logging`, and nested `voice_settings`
+- `providers.elevenlabs`: ElevenLabs defaults, with its own `voice_id`, `model`, `speed`, and optional provider-native fields such as `output_format`, `timestamps`, `language_code`, `seed`, `enable_logging`, `continuity_mode`, and nested `voice_settings`
 
 Runtime precedence:
 
@@ -351,9 +353,11 @@ Example:
       "speed": 1.0,
       "model": "eleven_multilingual_v2",
       "output_format": "mp3_44100_128",
+      "timestamps": true,
       "language_code": "zh",
       "seed": 12345,
       "enable_logging": true,
+      "continuity_mode": "adjacent_text",
       "voice_settings": {
         "speed": 0.95,
         "stability": 0.5,
@@ -387,15 +391,18 @@ export ELEVENLABS_API_KEY="your_elevenlabs_key"
 
 ### 6.5 ElevenLabs config surface note
 
-`providers.elevenlabs` supports provider-native request fields such as `output_format`, `language_code`, `seed`, `enable_logging`, and nested `voice_settings`.
+`providers.elevenlabs` supports provider-native request fields such as `output_format`, `timestamps`, `language_code`, `seed`, `enable_logging`, `continuity_mode`, and nested `voice_settings`.
 
 Current runtime note:
 
 - `output_format` is sent as an ElevenLabs query parameter
+- `timestamps: true` switches ElevenLabs to `/with-timestamps` and writes one `.timestamps.json` sidecar per successful segment
 - `enable_logging` is sent as an ElevenLabs query parameter when configured
 - `language_code` and `seed` are sent in the ElevenLabs request body when configured
+- `continuity_mode: "adjacent_text"` makes batch runs send neighboring segment text as `previous_text` and `next_text`
 - nested `voice_settings` fields are sent only when configured
 - `voice_settings.speed` overrides the provider-level ElevenLabs `speed` for the request when both are present
+- continuity is opt-in and config-only in the current release
 
 ### 6.6 Using a custom config path
 
@@ -410,6 +417,8 @@ ttsrun examples/sample.txt --config /path/to/config.json
 - `ttsrun` is TTS-only. It expects an existing `voice_id`.
 - `--provider minimax` supports MiniMax-specific controls such as `--pitch`, `--language-boost`, and `--sample-rate`.
 - `--provider elevenlabs` supports the shared controls plus provider-local config fields under `providers.elevenlabs`.
+- ElevenLabs-native fields remain config-only in the current CLI. There are no `--el-*` flags in this release.
+- ElevenLabs timestamp metadata is available through `providers.elevenlabs.timestamps: true`.
 - MiniMax-only flags are rejected when `--provider elevenlabs` is active.
 
 ## 7. Option Quick Reference
@@ -435,6 +444,9 @@ ttsrun examples/sample.txt --config /path/to/config.json
   - `--pitch` (integer)
   - `--language-boost`
   - `--sample-rate`
+- ElevenLabs-native parameters:
+  - configure these under `providers.elevenlabs`
+  - current release does not expose `--el-*` CLI flags
 - Workflow switches:
   - `--merge`
   - `--open`

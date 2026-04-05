@@ -53,9 +53,11 @@ class ElevenLabsConfig:
     speed: float = ELEVENLABS_DEFAULT_SPEED
     model: str = ELEVENLABS_DEFAULT_MODEL
     output_format: str = ELEVENLABS_DEFAULT_OUTPUT_FORMAT
+    timestamps: bool | None = None
     language_code: str | None = None
     seed: int | None = None
     enable_logging: bool | None = None
+    continuity_mode: str | None = None
     voice_settings: "ElevenLabsVoiceSettings" = field(
         default_factory=lambda: ElevenLabsVoiceSettings()
     )
@@ -164,6 +166,22 @@ def _coerce_optional_bool(value: Any, field_name: str) -> bool | None:
     if value is None:
         return None
     return _coerce_bool(value, field_name)
+
+
+def _coerce_optional_elevenlabs_continuity_mode(
+    value: Any,
+    field_name: str,
+) -> str | None:
+    mode = _coerce_optional_str(value, field_name)
+    if mode is None:
+        return None
+    supported_modes = {"adjacent_text"}
+    if mode not in supported_modes:
+        supported = ", ".join(sorted(supported_modes))
+        raise ConfigError(
+            f"Config field '{field_name}' must be one of: {supported}."
+        )
+    return mode
 
 
 def _coerce_provider(value: Any, field_name: str = "default_provider") -> str:
@@ -364,6 +382,11 @@ def load_config(config_path: str | None) -> AppConfig:
         elevenlabs_updates["output_format"] = _coerce_str(
             elevenlabs_values["output_format"], "providers.elevenlabs.output_format"
         )
+    if "timestamps" in elevenlabs_values:
+        elevenlabs_updates["timestamps"] = _coerce_optional_bool(
+            elevenlabs_values["timestamps"],
+            "providers.elevenlabs.timestamps",
+        )
     if "language_code" in elevenlabs_values:
         elevenlabs_updates["language_code"] = _coerce_optional_str(
             elevenlabs_values["language_code"],
@@ -377,6 +400,11 @@ def load_config(config_path: str | None) -> AppConfig:
         elevenlabs_updates["enable_logging"] = _coerce_optional_bool(
             elevenlabs_values["enable_logging"],
             "providers.elevenlabs.enable_logging",
+        )
+    if "continuity_mode" in elevenlabs_values:
+        elevenlabs_updates["continuity_mode"] = _coerce_optional_elevenlabs_continuity_mode(
+            elevenlabs_values["continuity_mode"],
+            "providers.elevenlabs.continuity_mode",
         )
 
     elevenlabs_voice_settings_values = elevenlabs_values.get("voice_settings", {})

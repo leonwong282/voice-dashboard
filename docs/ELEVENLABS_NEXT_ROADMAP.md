@@ -230,7 +230,12 @@ Use three categories of CLI surface:
 
 #### ElevenLabs-only flags
 
-Only expose these after Phase 1 and Phase 2 are complete:
+Current decision:
+
+- keep ElevenLabs-native fields config-only for now
+- do not add `--el-*` flags in the current phase
+
+If ElevenLabs-only flags are added later, start with:
 
 - `--el-output-format`
 - `--el-language-code`
@@ -261,8 +266,9 @@ That makes continuity controls more valuable here than in many simpler wrappers.
 - evaluate whether adjacent segments should automatically populate:
   - `previous_text`
   - `next_text`
-- add an opt-in mode such as:
-  - `--el-continuity adjacent-text`
+- current implementation decision:
+  - keep continuity config-only under `providers.elevenlabs.continuity_mode`
+  - support `adjacent_text` as the first opt-in mode
 - document when continuity improves results and when it can over-constrain generation
 
 ### Acceptance
@@ -276,22 +282,78 @@ That makes continuity controls more valuable here than in many simpler wrappers.
 
 Decide whether this tool should remain a file-oriented batch CLI only, or also expose real-time/provider-native output modes.
 
-### Recommendation
+### Decision
 
-Do not start with streaming.
+Choose timestamps first. Do not start with streaming in the next implementation phase.
 
-Prefer timestamps first if there is a downstream need for:
+### Rationale
+
+This repository is still shaped around:
+
+- paragraph/blank-line segmentation
+- per-segment file generation
+- `manifest.json` as the primary output index
+- optional merge into a final MP3
+
+That makes timestamp metadata a cleaner fit than real-time streaming. Timestamp output can improve:
 
 - subtitle alignment
 - segment QA
 - reading-speed analysis
 
-Only add streaming if there is a concrete user workflow that benefits from it.
+Streaming should stay deferred until there is a concrete user workflow that benefits from:
+
+- real-time playback while synthesis is still running
+- interactive preview UX
+- incremental downstream consumption instead of file-oriented batch output
 
 ### Decision gate
 
 - if the product remains primarily offline batch generation, timestamps are more aligned than streaming
 - if interactive playback becomes a goal, streaming can become a separate track
+
+### Target Output Shape For Timestamp Work
+
+Before coding, treat timestamp support as a new additive output artifact rather than a replacement for the existing audio-first flow.
+
+Recommended first shape:
+
+- keep the current audio file output unchanged
+- keep `manifest.json` as the batch index
+- write one sidecar timestamp file per successful segment, for example:
+  - `0001.timestamps.json`
+  - `0002.timestamps.json`
+- add a manifest pointer for each successful segment, for example:
+  - `timestamp_file`
+  - `timestamp_status`
+
+Recommended sidecar JSON shape:
+
+```json
+{
+  "provider": "elevenlabs",
+  "segment_index": 1,
+  "text": "第一段",
+  "audio_file": "0001.mp3",
+  "alignment": {
+    "characters": [],
+    "character_start_times_seconds": [],
+    "character_end_times_seconds": []
+  },
+  "normalized_alignment": {
+    "characters": [],
+    "character_start_times_seconds": [],
+    "character_end_times_seconds": []
+  }
+}
+```
+
+Design rules:
+
+- timestamp output should be opt-in
+- timestamp files should only be written for providers that actually support them
+- timestamp support must not break existing `--merge` behavior
+- streaming remains out of scope for this phase
 
 ## 10. Phase 8: Tests And Manual Verification
 

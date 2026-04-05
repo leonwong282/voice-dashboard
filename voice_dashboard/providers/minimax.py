@@ -6,7 +6,11 @@ import requests
 
 from voice_dashboard.defaults import API_URL
 from voice_dashboard.errors import ApiError, AuthenticationError, RetryableApiError
-from voice_dashboard.providers.base import MiniMaxTTSSettings
+from voice_dashboard.providers.base import (
+    MiniMaxTTSSettings,
+    SegmentSynthesisContext,
+    SynthesisResult,
+)
 
 
 def extract_api_error_message(response: requests.Response) -> str:
@@ -63,7 +67,8 @@ class MiniMaxProvider:
         settings: MiniMaxTTSSettings,
         api_key: str,
         timeout_seconds: int,
-    ) -> bytes:
+        context: SegmentSynthesisContext | None = None,
+    ) -> SynthesisResult:
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -122,7 +127,7 @@ class MiniMaxProvider:
         if not isinstance(audio_hex, str) or not audio_hex:
             raise ApiError("API response did not include audio data.")
 
-        return decode_audio_hex(audio_hex)
+        return SynthesisResult(audio_bytes=decode_audio_hex(audio_hex))
 
 
 MINIMAX_PROVIDER = MiniMaxProvider()
